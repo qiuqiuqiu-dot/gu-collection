@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """线上验证：注销账号真的把账号和数据（含磁盘图片）一起删干净。
 
-**绝不动 demo / qiu / xin**：注册一个临时账号，把三道保险、真注销、
+**绝不动库里已有的真实账号**：注册一个临时账号，把三道保险、真注销、
 以及「别的账号分毫未动」都验一遍，最后把临时账号和它带出来的文件清掉。
 清场注册在 atexit 上，脚本中途崩了也不会留垃圾。
 """
@@ -25,7 +25,9 @@ DB = os.path.join(ROOT_DIR, "instance", "gu.db")
 UP_DIR = os.path.join(ROOT_DIR, "static", "uploads")
 TEMP_USER = "del_probe"
 TEMP_PASS = "probe123456"
-REAL_USERS = ("demo", "qiu", "xin")
+#: 库里原有的真实账号——从数据库读，不写死名字（别人的库账号名不一样）
+REAL_USERS = [r[0] for r in sqlite3.connect(DB).execute(
+    "SELECT username FROM users ORDER BY id")]
 ok = 0
 bad = []
 

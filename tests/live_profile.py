@@ -407,7 +407,7 @@ check("数据里没有的区判为无效",
       regions.is_valid("中国", "广东省", "深圳市", "不存在区") is False)
 check("真实存在的区判为有效",
       regions.is_valid("中国", "广东省", "深圳市", "南山区") is True)
-check("qiu 库里的写法没被程序偷偷改掉（要他自己保存才变）",
+check("别人库里的地区写法没被程序偷偷改掉（要本人保存才变）",
       [u[1] for u in users_now()] == [u[1] for u in before_users],
       [u[1] for u in users_now()])
 

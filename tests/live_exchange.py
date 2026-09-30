@@ -102,6 +102,9 @@ seed_rows = [(i, 1, e, t, w, d, None, None, None, None, c1, c2)
 before = rows_db()
 demo_region_before = sqlite3.connect(DB).execute(
     "SELECT region FROM users WHERE username='demo'").fetchone()[0]
+# 起手有哪些账号：结束时要一模一样（不写死名字，别人的库不一样）
+users_before = sorted(r[0] for r in sqlite3.connect(DB).execute(
+    "SELECT username FROM users"))
 
 print("=== 0. 起手：线上库的老数据 = 种子原值 ===")
 check("测试前 3 条老信息，值就是 init_db 的种子值", before == seed_rows, before)
@@ -269,8 +272,11 @@ check("demo 的地区还原", sqlite3.connect(DB).execute(
     == demo_region_before)
 check("临时谷友账号已删除", sqlite3.connect(DB).execute(
     "SELECT COUNT(*) FROM users WHERE username=?", (VIEWER[0],)).fetchone()[0] == 0)
-check("账号还是 demo / qiu 两个", sorted(r[0] for r in sqlite3.connect(DB).execute(
-    "SELECT username FROM users")) == ["demo", "qiu"])
+check("账号还是起手那些（临时账号已清掉）",
+      sorted(r[0] for r in sqlite3.connect(DB).execute(
+          "SELECT username FROM users")) == users_before,
+      (users_before, sorted(r[0] for r in sqlite3.connect(DB).execute(
+          "SELECT username FROM users"))))
 
 print("\n" + "=" * 46)
 print(f"通过 {ok} / 失败 {len(bad)}")
