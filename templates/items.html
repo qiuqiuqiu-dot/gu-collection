@@ -12,7 +12,13 @@
     <header class="app-header">
       <div class="greet">
         <h1>谷柜</h1>
-        <p>共 {{ total_items }} 件 · 点图片看大图和详情</p>
+        <p>
+          {% if filtered %}
+          共 {{ total_items }} 件 · 筛选后 {{ matched_items }} 件
+          {% else %}
+          共 {{ total_items }} 件 · 点图片看大图和详情
+          {% endif %}
+        </p>
       </div>
       <a class="back-btn" href="{{ url_for('main.index') }}"
          aria-label="返回首页" title="返回首页">
@@ -25,10 +31,73 @@
       </a>
     </header>
 
+    {# 搜索 / 筛选 / 排序：用 GET，参数全在地址栏里，能直接收藏或分享 #}
+    <form class="filter-bar" method="get" action="{{ url_for('main.all_items') }}"
+          id="filterForm">
+      <input type="hidden" name="group" value="{{ group }}">
+      <div class="search-row">
+        <input type="search" name="q" id="searchInput" maxlength="40"
+               value="{{ query.q or '' }}" autocomplete="off"
+               placeholder="搜名字 / 订单号 / 备注">
+        <button type="submit" id="searchBtn">搜索</button>
+      </div>
+      <div class="filter-row">
+        <select name="type" id="filterType" data-autosubmit
+                aria-label="按品类筛选">
+          <option value="">全部品类</option>
+          {% for c in cats_type %}
+          <option value="{{ c.id }}" {% if query.type == c.id %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+        <select name="ip" id="filterIp" data-autosubmit aria-label="按作品IP筛选">
+          <option value="">全部作品</option>
+          {% for c in cats_ip %}
+          <option value="{{ c.id }}" {% if query.ip == c.id %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+        <select name="sort" id="sortSelect" data-autosubmit aria-label="排序方式">
+          {% for mode in sort_modes %}
+          <option value="{{ mode }}" {% if sort == mode %}selected{% endif %}>
+            {{ sort_labels[mode] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if filtered %}
+      <p class="filter-summary">
+        找到 {{ matched_items }} 件，已显示 {{ shown_items }} 件
+        · <a href="{{ clear_url }}" id="clearFilters">清除筛选</a>
+      </p>
+      {% endif %}
+    </form>
+
     {% include "_catswitch.html" %}
 
-    <!-- 全部谷子，按选定维度分组 -->
+    {% if matched_items %}
+    <!-- 谷子网格，按选定维度分组 -->
     {% include "_grid.html" %}
+    {% else %}
+    <div class="empty">
+      {% if query.q %}
+      没找到含「{{ query.q }}」的谷子。
+      {% else %}
+      这个筛选条件下没有谷子。
+      {% endif %}
+      <a class="link-btn" href="{{ clear_url }}" id="emptyClear">清除筛选</a>
+    </div>
+    {% endif %}
+
+    {% if has_more %}
+    <div class="more-row">
+      <a class="more-btn" id="showMore" href="{{ more_url }}">
+        显示更多（还有 {{ matched_items - shown_items }} 件）
+      </a>
+    </div>
+    {% endif %}
 
   </div>
 
@@ -36,4 +105,11 @@
   {% include "_viewer.html" %}
 
 </div>
+
+<script>
+  // 筛选/排序的下拉一改就提交，手机上少按一次
+  document.querySelectorAll('#filterForm select[data-autosubmit]').forEach(function (sel) {
+    sel.addEventListener('change', function () { sel.form.submit(); });
+  });
+</script>
 {% endblock %}

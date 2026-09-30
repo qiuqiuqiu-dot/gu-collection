@@ -236,6 +236,55 @@ check("专区页不再用只有小箭头的 icon-btn 当返回",
       all('class="icon-btn" href="/"' not in pages_html[p]
           for p in ("/items", "/transit", "/sold", "/wishlist", "/reminders")))
 
+print("\n=== 谷柜页：搜索 / 筛选 / 排序（只读，不动数据）===")
+items_html = pages_html["/items"]
+check("谷柜页有搜索框 + 三个下拉",
+      'id="searchInput"' in items_html and 'id="filterType"' in items_html
+      and 'id="filterIp"' in items_html and 'id="sortSelect"' in items_html)
+check("搜索和筛选都在 GET 表单里（条件在地址栏，可收藏可分享）",
+      'id="filterForm"' in items_html and 'method="get" action="/items"' in items_html)
+sort_block = re.search(r'id="sortSelect".*?</select>', items_html, re.S)
+check("排序下拉列出了全部 6 种排序",
+      sort_block is not None and sort_block.group(0).count("<option") == 6,
+      sort_block.group(0).count("<option") if sort_block else "没找到排序下拉")
+
+# 拿库里真实的一件谷子名字去搜，应该能搜到它
+with sqlite3.connect(DB) as c:
+    row = c.execute("SELECT name FROM gu_items WHERE user_id="
+                    "(SELECT id FROM users WHERE username='demo')"
+                    " AND status='displaying' LIMIT 1").fetchone()
+if not row:
+    print("  （demo 现在没有展示中的谷子，跳过「搜得到」那几条）")
+else:
+    real_name = row[0]
+    # 先记住不筛时有多少张卡片——搜索必须让它变少，
+    # 否则「页面上有这个名字」在搜索被忽略时也会成立（这个坑踩过一次）
+    card = 'class="g-card"'
+    code, full_page = req(follow, "/items")
+    full_cards = full_page.count(card)
+    code, page = req(follow, f"/items?q={urllib.parse.quote(real_name)}")
+    hit_cards = page.count(card)
+    check(f"搜库里真实的名字「{real_name}」能搜到", code == 200 and real_name in page,
+          code)
+    check("搜索真的生效了（结果比不筛时少，不是把全部又渲染了一遍）",
+          0 < hit_cards < full_cards, f"{hit_cards} / 不筛 {full_cards}")
+    check("搜到之后有「找到 N 件」的提示和清除入口",
+          "找到" in page and 'id="clearFilters"' in page)
+    code, page = req(follow, f"/items?q={urllib.parse.quote('绝不可能存在的谷子名')}")
+    check("搜不存在的名字给空状态，不是白屏也不是报错",
+          code == 200 and "没找到含" in page and 'id="emptyClear"' in page, code)
+    check("搜不到时不显示任何卡片", page.count(card) == 0, page.count(card))
+
+# 排序和筛选参数在真库上也不能把页面弄崩
+for extra in ("?sort=count", "?sort=price", "?sort=name", "?sort=old", "?sort=expect",
+              "?type=999999", "?ip=abc", "?n=48", "?q=&type=&ip=&sort="):
+    code, page = req(follow, f"/items{extra}")
+    check(f"{extra} 这个参数组合不报错", code == 200 and 'class="screen"' in page, code)
+
+code, page = req(follow, "/items")
+check("总数不到一屏（demo 现在 6 件）时不给「显示更多」",
+      'id="showMore"' not in page)
+
 print("\n" + "=" * 46)
 print(f"通过 {ok} / 失败 {len(bad)}")
 if bad:

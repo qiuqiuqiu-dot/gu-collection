@@ -41,6 +41,20 @@ def _exchange_enabled():
 # 谷柜默认只展示这么多件，其余去谷柜页看
 PANEL_PREVIEW = 6
 
+# 谷柜页一屏先给这么多，更多点「显示更多」；一次最多放到 MAX_PAGE_SIZE
+PAGE_SIZE = 24
+MAX_PAGE_SIZE = 500
+
+SORT_MODES = ("new", "old", "name", "count", "price", "expect")
+SORT_LABELS = {
+    "new": "最新添加",
+    "old": "最早添加",
+    "name": "按名字",
+    "count": "数量多→少",
+    "price": "入手价高→低",
+    "expect": "快到货的",
+}
+
 # 谷柜页的分组方式：默认「全部」——先平铺看全部，再让用户自己选要不要按分类看
 GROUP_MODES = ("all", "type", "ip")
 GROUP_LABELS = {"all": "全部", "type": "按品类", "ip": "按作品IP"}
@@ -253,9 +267,90 @@ def _current_group():
 
     刻意不记进 session：每次进谷柜都先平铺看全部，再由用户自己决定要不要按分类看；
     记进 session 的话第二次进来就直接是分类视图了，和「先展示全部」相反。
+    搜索/筛选/排序同理，都是每次从 URL 读，不记忆。
     """
     wanted = request.args.get("group")
     return wanted if wanted in GROUP_MODES else GROUP_MODES[0]
+
+
+def _current_sort():
+    """排序方式：只认白名单里的，非法值退回默认。"""
+    wanted = request.args.get("sort")
+    return wanted if wanted in SORT_MODES else SORT_MODES[0]
+
+
+def _current_page_size():
+    """显示多少件（「显示更多」每次加一屏），上下都有边界。"""
+    try:
+        size = int(request.args.get("n", PAGE_SIZE))
+    except (TypeError, ValueError):
+        return PAGE_SIZE
+    return max(PAGE_SIZE, min(size, MAX_PAGE_SIZE))
+
+
+def _current_filters():
+    """搜索关键词 + 品类/作品IP 筛选。
+
+    分类 id 必须是当前用户自己的分类，别人的（或乱填的）一律当没选。
+    """
+    def cat_id(kind):
+        raw = (request.args.get(kind) or "").strip()
+        if not raw.isdigit():
+            return None
+        cat = current_user.categories.filter_by(id=int(raw), kind=kind).first()
+        return cat.id if cat else None
+
+    return {"q": _clean(request.args.get("q"), 40),
+            "type": cat_id("type"),
+            "ip": cat_id("ip")}
+
+
+def _has_filters(query):
+    return bool(query["q"] or query["type"] or query["ip"])
+
+
+def _apply_filters(items, query):
+    """按关键词和分类筛一遍。
+
+    关键词匹配名字、订单号、备注和 emoji——搜「SF123」找订单号、
+    搜备注里的「只收原画」都能找到，比只搜名字实用。
+    """
+    keyword = (query["q"] or "").lower()
+    out = []
+    for item in items:
+        if query["type"] and item.category_type_id != query["type"]:
+            continue
+        if query["ip"] and item.category_ip_id != query["ip"]:
+            continue
+        if keyword:
+            haystack = " ".join(str(x) for x in
+                                (item.name, item.order_no, item.want_note, item.emoji)
+                                if x).lower()
+            if keyword not in haystack:
+                continue
+        out.append(item)
+    return out
+
+
+def _sort_items(items, mode):
+    """排序。缺值的一律排最后，不参与比较，免得 None 和数字比大小。
+
+    「最新/最早」都拿 id 兜底：一秒钟内连着加好几件时 created_at 会完全相同，
+    只按时间排的话顺序是随机的，同一个页面刷新两次都可能不一样。
+    """
+    if mode == "name":
+        return sorted(items, key=lambda i: (i.name or ""))
+    if mode == "count":
+        return sorted(items, key=lambda i: (-(i.count or 0), -i.id))
+    if mode == "price":
+        return sorted(items, key=lambda i: (-(i.price or 0), -i.id))
+    if mode == "expect":
+        # 快到货的在前；没填预计日期的排最后
+        return sorted(items, key=lambda i: (i.expect_date is None,
+                                            i.expect_date or local_today(), -i.id))
+    if mode == "old":
+        return sorted(items, key=lambda i: (i.created_at or utcnow(), i.id))
+    return sorted(items, key=lambda i: (i.created_at or utcnow(), i.id), reverse=True)
 
 
 def _group_items(items, kind):
@@ -502,13 +597,42 @@ def wishlist():
 @bp.route("/items")
 @login_required
 def all_items():
-    """完整谷柜页：这里是唯一按分类分组查看的地方。"""
+    """完整谷柜页：搜索、筛选、排序、分页，以及唯一按分类分组查看的地方。
+
+    顺序是「先筛后排序，再按分组展示，最后取一屏」：
+    筛选和分组是两个正交的维度，组合起来才自然（比如筛选出「吧唧」再按作品IP分组）。
+    """
     group = _current_group()
-    items = _items_of(current_user)
+    query = _current_filters()
+    sort = _current_sort()
+    size = _current_page_size()
+
+    everything = _items_of(current_user)
+    matched = _sort_items(_apply_filters(everything, query), sort)
+    shown = matched[:size]
+    more_size = min(size + PAGE_SIZE, MAX_PAGE_SIZE)
+
+    # 分组切换和「显示更多」都要带着当前的搜索/筛选/排序，不然一点就丢
+    keep = {k: v for k, v in (("q", query["q"]), ("type", query["type"]),
+                              ("ip", query["ip"]), ("sort", sort)) if v}
+    group_urls = {mode: url_for("main.all_items", group=mode, **keep)
+                  for mode in GROUP_MODES}
+
     return render_template(
         "items.html",
-        groups=_group_items(items, group),
-        total_items=len(items),
+        groups=_group_items(shown, group),
+        total_items=len(everything),
+        matched_items=len(matched),
+        shown_items=len(shown),
+        has_more=len(matched) > len(shown),
+        more_url=url_for("main.all_items", group=group, n=more_size, **keep),
+        clear_url=url_for("main.all_items", group=group),
+        group_urls=group_urls,
+        query=query,
+        filtered=_has_filters(query),
+        sort=sort,
+        sort_modes=SORT_MODES,
+        sort_labels=SORT_LABELS,
         group=group,
         group_modes=GROUP_MODES,
         group_labels=GROUP_LABELS,

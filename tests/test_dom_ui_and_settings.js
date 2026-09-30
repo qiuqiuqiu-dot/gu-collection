@@ -19,12 +19,21 @@ function load(file, url, opts) {
     /<link[^>]+style\.css[^>]*>/, `<style>${css}</style>`);
   // 地区页会 fetch 静态的 regions.json：这里塞一份小小的假数据进去，
   // 好在 jsdom 里把四级联动那段逻辑真跑一遍
+  const injected = [];
   if (opts && opts.tree) {
-    const stub = `<script>window.fetch = function () {
+    injected.push(`window.fetch = function () {
       return Promise.resolve({ json: function () {
         return Promise.resolve(${JSON.stringify(opts.tree)}); } });
-    };<\/script>`;
-    html = html.replace("<head>", "<head>" + stub);
+    };`);
+  }
+  // jsdom 没实现 form.submit()，会抛 "Not implemented" 并污染「无 JS 报错」这条；
+  // 换成计数桩，这样还能顺带验证「改下拉就提交」那段逻辑真的挂上了
+  if (opts && opts.stubSubmit) {
+    injected.push("window.__submits = 0;\n"
+      + "HTMLFormElement.prototype.submit = function () { window.__submits += 1; };");
+  }
+  if (injected.length) {
+    html = html.replace("<head>", "<head><script>" + injected.join("\n") + "<\/script>");
   }
   const dom = new JSDOM(html, {
     runScripts: "dangerously", url, pretendToBeVisual: true, virtualConsole,
@@ -35,6 +44,51 @@ function load(file, url, opts) {
 
 const pending = [];
 const flush = () => new Promise((r) => setTimeout(r, 0));
+
+/* ---------- 谷柜页：搜索 / 筛选 / 排序 ---------- */
+{
+  const env = load("s_items.html", "http://127.0.0.1:5000/items",
+    { stubSubmit: true });
+  const doc = env.window.document;
+  const win = env.window;
+  const form = doc.querySelector("#filterForm");
+  check("谷柜页有搜索框和搜索按钮",
+    !!doc.querySelector("#searchInput") && !!doc.querySelector("#searchBtn"));
+  check("搜索框提示说明了能搜什么",
+    (doc.querySelector("#searchInput").getAttribute("placeholder") || "")
+      .indexOf("订单号") >= 0,
+    doc.querySelector("#searchInput").getAttribute("placeholder"));
+  check("搜索框是 GET 表单（条件在地址栏里，可收藏可分享）",
+    form && form.getAttribute("method").toLowerCase() === "get"
+    && form.getAttribute("action") === "/items", form && form.getAttribute("method"));
+  check("三个下拉：品类 / 作品IP / 排序",
+    !!doc.querySelector("#filterType") && !!doc.querySelector("#filterIp")
+    && !!doc.querySelector("#sortSelect"));
+  check("排序下拉列出了所有排序方式",
+    doc.querySelectorAll("#sortSelect option").length === 6,
+    doc.querySelectorAll("#sortSelect option").length);
+  check("品类下拉第一项是「全部品类」（默认不筛）",
+    doc.querySelector("#filterType option").value === ""
+    && doc.querySelector("#filterType option").textContent.trim() === "全部品类");
+  check("切换分组时带着当前条件（隐藏字段保留 group）",
+    !!form.querySelector('input[name="group"]'));
+  check("三个下拉都挂上了「改动即提交」",
+    ["#filterType", "#filterIp", "#sortSelect"]
+      .every((s) => doc.querySelector(s).hasAttribute("data-autosubmit")));
+
+  // 真的改一下下拉：应该触发一次提交
+  const before = win.__submits;
+  const sortSel = doc.querySelector("#sortSelect");
+  sortSel.value = sortSel.options[1].value;
+  sortSel.dispatchEvent(new win.Event("change"));
+  check("改排序下拉会立刻提交表单", win.__submits === before + 1,
+    `${before} -> ${win.__submits}`);
+  const typeSel = doc.querySelector("#filterType");
+  typeSel.dispatchEvent(new win.Event("change"));
+  check("改品类下拉也会提交", win.__submits === before + 2, win.__submits);
+  check("谷柜页（带筛选栏）无 JS 报错",
+    env.pageErrors.length === 0, env.pageErrors.join(" | "));
+}
 
 /* ---------- 谷柜页（切换条里） ---------- */
 {

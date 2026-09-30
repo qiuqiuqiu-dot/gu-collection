@@ -1,10 +1,12 @@
 {# 谷柜页的分组切换条——默认「全部」，再按品类/作品IP 看。
-   用 request.endpoint 生成链接，切换后仍留在谷柜页；
-   选中的方式存进 session，翻页也记得。 #}
+   链接由路由预先算好（group_urls），这样切换分组不会把当前的
+   搜索词 / 筛选 / 排序一起丢掉。
+   分组方式刻意不记进 session：每次进来都先平铺看全部。 #}
 <div class="seg-row">
   {% for mode in group_modes %}
   <a class="seg-btn{% if group == mode %} active{% endif %}"
-     href="{{ url_for(request.endpoint, group=mode) }}">{{ group_labels[mode] }}</a>
+     href="{{ group_urls[mode] if group_urls is defined
+              else url_for(request.endpoint, group=mode) }}">{{ group_labels[mode] }}</a>
   {% endfor %}
   {% include "_cat_manage.html" %}
 </div>

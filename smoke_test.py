@@ -20,6 +20,7 @@ from sqlalchemy import inspect as sa_inspect  # noqa: E402
 
 import backup  # noqa: E402
 import regions  # noqa: E402
+import routes  # noqa: E402
 from app import create_app, login_manager  # noqa: E402
 from models import (Category, Exchange, GuItem, Reminder, User, db,  # noqa: E402
                     local_today)
@@ -3039,6 +3040,133 @@ ok_login = lock.post("/login", data={"username": "sec_b", "password": "abc123"},
 check("锁定时间过了就能正常登录",
       "次数太多" not in ok_login.get_data(as_text=True)
       and lock.get("/profile").status_code == 200)
+
+print("\n=== 26. 谷柜页：搜索 / 筛选 / 排序 / 分页 ===")
+app21 = fresh_app(db_uri("verify_search.db"), WTF_CSRF_ENABLED=False)
+sx = app21.test_client()
+sx.post("/register", data={"username": "searchuser", "password": "abc123"})
+sx.post("/categories/add", data={"kind": "type", "name": "吧唧"})
+sx.post("/categories/add", data={"kind": "ip", "name": "某某"})
+with app21.app_context():
+    stype = Category.query.filter_by(kind="type", name="吧唧").first().id
+    sip = Category.query.filter_by(kind="ip", name="某某").first().id
+
+# 造 30 件：数量、入手价、分类都有规律，方便验排序和筛选
+for i in range(1, 31):
+    sx.post("/items/add", data={
+        "name": f"谷子{i:02d}", "emoji": "🎁", "count": str(i),
+        "status": "displaying", "price": str(i * 10),
+        "category_type_id": str(stype) if i % 2 else "",
+        "category_ip_id": str(sip) if i % 3 == 0 else "",
+        "order_no": "SF0007" if i == 7 else "",
+        "want_note": "只收原画" if i == 8 else "",
+    })
+
+
+def grid_names(html):
+    """卡片上的名字，按渲染顺序（就是列表顺序）。"""
+    return re.findall(r'data-name="([^"]*)"', html)
+
+
+def first_card(html):
+    names = grid_names(html)
+    return names[0] if names else None
+
+
+board = sx.get("/items").get_data(as_text=True)
+check("默认先显示一屏 24 件（不是全量渲染）",
+      len(grid_names(board)) == 24, len(grid_names(board)))
+check("顶栏写着总数", "共 30 件" in board)
+check("还有剩的时候给「显示更多」（带剩余件数）",
+      'id="showMore"' in board and "还有 6 件" in board)
+check("默认排序是最新添加（第 30 件在最前）",
+      first_card(board) == "谷子30", first_card(board))
+more = sx.get("/items?n=48").get_data(as_text=True)
+check("n 变大后能一次显示全部 30 件", len(grid_names(more)) == 30,
+      len(grid_names(more)))
+check("全显示完了就不再给「显示更多」", 'id="showMore"' not in more)
+with app21.test_request_context("/items?n=9999"):
+    check("每页上限有封顶（防止一次渲染几千件）",
+          routes._current_page_size() == routes.MAX_PAGE_SIZE,
+          routes._current_page_size())
+with app21.test_request_context("/items?n=abc"):
+    check("n 传脏值退回默认", routes._current_page_size() == routes.PAGE_SIZE)
+with app21.test_request_context("/items?sort=不存在的"):
+    check("sort 传脏值退回默认", routes._current_sort() == "new")
+
+# --- 搜索 ---
+hit = sx.get("/items?q=谷子07").get_data(as_text=True)
+check("按名字搜只出那一件", grid_names(hit) == ["谷子07"], grid_names(hit))
+check("搜到之后显示「找到 N 件」", "找到 1 件" in hit)
+check("搜索状态下有清除入口", 'id="clearFilters"' in hit)
+check("按订单号也能搜到（搜的不只是名字）",
+      grid_names(sx.get("/items?q=SF0007").get_data(as_text=True)) == ["谷子07"])
+check("按备注也能搜到",
+      grid_names(sx.get("/items?q=只收原画").get_data(as_text=True)) == ["谷子08"])
+miss = sx.get("/items?q=不存在的名字").get_data(as_text=True)
+check("搜不到时给空状态提示", "没找到含「不存在的名字」的谷子" in miss)
+check("空状态里也能一键清除筛选", 'id="emptyClear"' in miss)
+xss = sx.get("/items?q=<script>alert(1)</script>").get_data(as_text=True)
+check("关键词里的尖括号被转义，不会变成真标签",
+      "<script>alert(1)</script>" not in xss and "&lt;script&gt;" in xss)
+
+# --- 筛选 ---
+by_type = sx.get(f"/items?type={stype}").get_data(as_text=True)
+check("按品类筛选只出奇数件（15 件）", len(grid_names(by_type)) == 15,
+      len(grid_names(by_type)))
+check("筛选后顶栏显示「筛选后 N 件」", "筛选后 15 件" in by_type)
+by_ip = sx.get(f"/items?ip={sip}").get_data(as_text=True)
+check("按作品IP筛选只出 3 的倍数（10 件）", len(grid_names(by_ip)) == 10,
+      len(grid_names(by_ip)))
+both = sx.get(f"/items?type={stype}&ip={sip}").get_data(as_text=True)
+check("两个筛选条件是「且」（奇数且 3 的倍数：3/9/15/21/27，5 件）",
+      len(grid_names(both)) == 5, len(grid_names(both)))
+check("筛选组合起来仍然是最新在前（这批里最新的是谷子27）",
+      first_card(both) == "谷子27", first_card(both))
+combo = grid_names(sx.get(f"/items?type={stype}&q=谷子0").get_data(as_text=True))
+check("筛选能和搜索叠加（奇数且名字含谷子0）",
+      combo == ["谷子09", "谷子07", "谷子05", "谷子03", "谷子01"], combo)
+with app21.app_context():
+    other = User(username="other_owner")
+    other.set_password("abc123")
+    db.session.add(other)
+    db.session.commit()
+    other_cat = Category(user_id=other.id, kind="type", name="别人的分类")
+    db.session.add(other_cat)
+    db.session.commit()
+    other_cat_id = other_cat.id
+check("拿别人的分类 id 来筛等于没筛（不能借它探测别的东西）",
+      len(grid_names(sx.get(f"/items?type={other_cat_id}").get_data(as_text=True)))
+      == 24)
+check("乱填的筛选参数不报错", sx.get("/items?type=abc&ip=-1").status_code == 200)
+
+# --- 排序 ---
+check("按数量排：最多的一件在最前",
+      first_card(sx.get("/items?sort=count").get_data(as_text=True)) == "谷子30")
+check("按入手价排：最贵的一件在最前",
+      first_card(sx.get("/items?sort=price").get_data(as_text=True)) == "谷子30")
+check("按名字排：谷子01 在最前",
+      first_card(sx.get("/items?sort=name").get_data(as_text=True)) == "谷子01")
+check("最早添加：谷子01 在最前",
+      first_card(sx.get("/items?sort=old").get_data(as_text=True)) == "谷子01")
+check("快到货的（大多没填日期）也不报错",
+      sx.get("/items?sort=expect").status_code == 200)
+
+# --- 分组 / 翻页都要带着当前条件 ---
+seg = sx.get("/items?q=谷子0&sort=name").get_data(as_text=True)
+seg_links = re.findall(r'class="seg-btn[^"]*"\s+href="([^"]+)"', seg)
+check("切换分组时不丢搜索和排序",
+      bool(seg_links) and all("q=" in link and "sort=name" in link
+                              for link in seg_links), seg_links)
+more_link = re.search(r'id="showMore" href="([^"]+)"', board)
+check("「显示更多」也带着当前条件", more_link is not None
+      and "group=" in more_link.group(1))
+grouped = sx.get(f"/items?group=type&type={stype}").get_data(as_text=True)
+check("筛选之后按品类分组，只出现被筛出来的那一组",
+      grouped.count("group-head") == 1, grouped.count("group-head"))
+check("筛选条件不会被记住（重新进谷柜还是全部 30 件）",
+      "共 30 件" in sx.get("/items").get_data(as_text=True)
+      and len(grid_names(sx.get("/items?n=100").get_data(as_text=True))) == 30)
 
 print("\n" + "=" * 46)
 if FAILS:
