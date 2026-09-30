@@ -26,6 +26,11 @@ from werkzeug.datastructures import FileStorage
 BACKUP_DIRNAME = "backups"
 KEEP_BACKUPS = 14          # 自动备份最多留几份
 FORMAT_VERSION = 1         # 导出文件格式版本
+#: 备份包 data.json 里的 app 标记（新导出的写 APP_NAME）
+APP_NAME = "囤谷屋"
+#: 读取时接受的名字。改过名，所以旧包里的「谷仓」也必须认，
+#: 否则用户以前导出的 zip 会被判成「不是本应用的文件」而导入失败。
+APP_NAMES = ("囤谷屋", "谷仓")
 MAX_IMPORT_ITEMS = 5000    # 一次最多导入多少件，防止塞爆
 MAX_ENTRY_BYTES = 12 * 1024 * 1024      # 单个照片解压后的大小上限
 MAX_TOTAL_BYTES = 200 * 1024 * 1024     # 整个压缩包解压后的总大小上限
@@ -187,7 +192,7 @@ def build_export(user):
         })
 
     data = {
-        "app": "谷仓",
+        "app": APP_NAME,
         "format": FORMAT_VERSION,
         "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "username": user.username,
@@ -232,7 +237,7 @@ def build_export(user):
                 zf.write(path, f"avatar/{user.avatar}")
     buf.seek(0)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return buf, f"谷仓-{user.username}-{stamp}.zip"
+    return buf, f"{APP_NAME}-{user.username}-{stamp}.zip"
 
 
 # ==================== 导入 ====================
@@ -294,7 +299,7 @@ def read_export(file):
     try:
         names = zf.namelist()
         if "data.json" not in names:
-            raise ValueError("备份包里没有 data.json，可能不是谷仓导出的文件")
+            raise ValueError(f"备份包里没有 data.json，可能不是{APP_NAME}导出的文件")
         # 防解压炸弹：先按元数据算总大小，不老实解压
         total = sum(i.file_size for i in zf.infolist())
         if total > MAX_TOTAL_BYTES:
@@ -303,8 +308,8 @@ def read_export(file):
             data = json.loads(zf.read("data.json").decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise ValueError("备份包里的 data.json 读不出来")
-        if not isinstance(data, dict) or data.get("app") != "谷仓":
-            raise ValueError("这不是谷仓导出的备份文件")
+        if not isinstance(data, dict) or data.get("app") not in APP_NAMES:
+            raise ValueError(f"这不是{APP_NAME}导出的备份文件")
         if _int(data.get("format"), 0) > FORMAT_VERSION:
             raise ValueError("这个备份是更新版本导出的，当前程序读不了")
         photos = {n[len("photos/"):]: n for n in names

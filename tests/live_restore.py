@@ -216,6 +216,28 @@ check("恢复出来的照片都真在磁盘上",
               " WHERE username=?)", (TEMP_USER,))))(),
       "有照片文件缺失")
 
+# --- 改名兼容：把包里的 app 字段改成旧名「谷仓」，必须照样能导入 ---
+# 这是改名这件事最要紧的一条：用户手里已有的 zip 和备份目录里的历史文件不能废掉
+legacy_buf = io.BytesIO()
+with zipfile.ZipFile(io.BytesIO(blob)) as src_zip:
+    with zipfile.ZipFile(legacy_buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
+        for info in src_zip.infolist():
+            raw = src_zip.read(info.filename)
+            if info.filename == "data.json":
+                meta = json.loads(raw.decode("utf-8"))
+                meta["app"] = "谷仓"          # 老名字
+                raw = json.dumps(meta, ensure_ascii=False).encode("utf-8")
+            out_zip.writestr(info.filename, raw)
+legacy_buf.seek(0)
+code, _ = post_multipart(probe_plain, "/backup/import",
+                         {"csrf_token": csrf(req(probe, "/backup")[1])},
+                         {"file": ("legacy.zip", legacy_buf.getvalue())})
+check("旧名字（谷仓）导出的包仍然能导入", code == 302, code)
+legacy_page = req(probe, "/backup")[1]
+check("导入提示里没把旧包当成「别的程序的文件」",
+      "不是囤谷屋导出" not in legacy_page and "导入完成" in legacy_page,
+      [ln.strip() for ln in legacy_page.splitlines() if "导入" in ln][:1])
+
 # --- 清场：临时账号 + 它带出来的照片（同一个 cleanup，退出时也会再兜一次）---
 cleanup()
 print("清场完成")

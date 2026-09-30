@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}我的谷仓{% endblock %}
+{% block title %}囤谷屋{% endblock %}
 {% block body %}
 <div class="phone">
   <div class="blob b1"></div>
@@ -11,7 +11,7 @@
     <!-- 顶栏 -->
     <header class="app-header">
       <div class="greet">
-        <h1>我的谷仓</h1>
+        <h1>囤谷屋</h1>
         <p>
           Hi, {{ current_user.username }} ✿
           {% if current_user.signature %}<br><span class="greet-sign">{{ current_user.signature }}</span>{% endif %}

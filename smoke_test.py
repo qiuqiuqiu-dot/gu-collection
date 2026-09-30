@@ -89,7 +89,7 @@ check("注册成功跳首页", r.status_code == 302 and r.headers.get("Location"
       f"{r.status_code} {r.headers.get('Location')}")
 
 body = anon.get("/").get_data(as_text=True)
-check("已登录首页 200 且渲染正常", "我的谷仓" in body)
+check("已登录首页 200 且渲染正常", "囤谷屋" in body)
 check("首页退出是 POST 表单", 'action="/logout"' in body)
 
 anon2 = app.test_client()
@@ -631,7 +631,7 @@ html_all = r.get_data(as_text=True)
 n_all = len(re.findall(r'<div class="g-card', html_all))
 names_all = re.findall(r'data-name="([^"]+)"', html_all)
 check("GET /items 200", r.status_code == 200, r.status_code)
-check("页面标题是谷柜", "<title>谷柜 · 谷仓</title>" in html_all)
+check("页面标题是谷柜（带应用名）", "<title>谷柜 · 囤谷屋</title>" in html_all)
 check("8 件时谷柜页显示全部 8 件", n_all == 8, n_all)
 check("谷柜页不做 6 件截断（00..07 全在）",
       sorted(names_all) == [f"谷子{n:02d}" for n in range(8)], names_all)
@@ -2293,7 +2293,7 @@ zip_names = zf.namelist()
 raw_json = zf.read("data.json").decode("utf-8")
 data = json.loads(raw_json)
 check("压缩包里有 data.json", "data.json" in zip_names)
-check("标记了来源和格式版本", data.get("app") == "谷仓" and data.get("format") == 1)
+check("标记了来源和格式版本", data.get("app") == backup.APP_NAME and data.get("format") == 1)
 check("四件谷子都导出了",
       {i["name"] for i in data["items"]}
       == {"带照片的色纸", "在途的立牌", "出掉的吧唧", "想要的挂件"},
@@ -2461,16 +2461,16 @@ n_before = count_c()
 check("不是 zip 的文件被拒绝", "不是备份包" in import_and_read(dx, b"this is not a zip"))
 check("缺 data.json 被拒绝",
       "没有 data.json" in import_and_read(dx, _zip_of({"hello.txt": "hi"})))
-check("不是谷仓导出被拒绝",
-      "不是谷仓导出" in import_and_read(
+check("别的程序导出的包被拒绝",
+      "不是囤谷屋导出" in import_and_read(
           dx, _zip_of({"data.json": json.dumps({"app": "别的程序", "format": 1})})))
 check("更高版本的备份被拒绝",
       "更新版本" in import_and_read(
-          dx, _zip_of({"data.json": json.dumps({"app": "谷仓", "format": 99})})))
+          dx, _zip_of({"data.json": json.dumps({"app": backup.APP_NAME, "format": 99})})))
 check("被拒绝的导入一件都没进来", count_c() == n_before, (n_before, count_c()))
 
 bad_zip = _zip_of({
-    "data.json": json.dumps({"app": "谷仓", "format": 1, "items": [
+    "data.json": json.dumps({"app": backup.APP_NAME, "format": 1, "items": [
         {"name": "带坏图的谷子", "image": "bad.png", "count": "2",
          "status": "displaying"}]}),
     "photos/bad.png": "这不是图片",
@@ -2483,6 +2483,24 @@ check("坏图不会让整包导入失败", bad_item is not None)
 check("坏图自动回落 emoji（没写进磁盘）",
       bad_item is not None and bad_item.image is None and bad_item.emoji == "🎁",
       bad_item and (bad_item.image, bad_item.emoji))
+
+# 应用改过名（谷仓 → 囤谷屋）：改名前导出的包必须照旧能导入，
+# 否则用户手里那些旧 zip、以及备份目录里的历史文件就全废了
+legacy_zip = _zip_of({
+    "data.json": json.dumps({"app": "谷仓", "format": 1, "items": [
+        {"name": "改名前导出的谷子", "count": "1", "status": "displaying"}]}),
+})
+n_before_legacy = count_c()
+do_import(dx, legacy_zip)
+with app17.app_context():
+    legacy_item = User.query.filter_by(username="bk_c").first().items.filter_by(
+        name="改名前导出的谷子").first()
+check("改名前导出的备份包仍然能导入（旧名继续认）", legacy_item is not None)
+check("旧包也走「追加」语义（不是覆盖）", count_c() == n_before_legacy + 1,
+      (n_before_legacy, count_c()))
+check("新包写新名，但旧名留在兼容名单里",
+      backup.APP_NAME == "囤谷屋" and "谷仓" in backup.APP_NAMES,
+      (backup.APP_NAME, backup.APP_NAMES))
 
 # --- 自动备份：立即备份 / 轮转 / 每天一次 / 启动一次 ---
 for name in os.listdir(BK_DIR):

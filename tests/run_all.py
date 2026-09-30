@@ -52,7 +52,7 @@ def run(title, argv, cwd=ROOT):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="跑完谷仓的全部测试")
+    parser = argparse.ArgumentParser(description="跑完囤谷屋的全部测试")
     parser.add_argument("--live", action="store_true",
                         help="再加上线上验证（需要先跑着 app.py）")
     parser.add_argument("--only", choices=["smoke", "render", "dom", "live"],
