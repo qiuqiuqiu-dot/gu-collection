@@ -31,6 +31,7 @@ DOM = ["tests/test_dom_exchange_board.js", "tests/test_dom_add_sheet.js",
        "tests/test_dom_ui_and_settings.js"]
 LIVE = ["tests/live_site_pages.py", "tests/live_backup.py", "tests/live_profile.py",
         "tests/live_restore.py",
+        "tests/live_delete.py",
         # 换谷开关关着时它自己会跳过（打印一句说明，退出码 0）
         "tests/live_exchange.py"]
 

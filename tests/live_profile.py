@@ -195,9 +195,10 @@ check("未登录访问被挡（302）", code2 == 302, code2)
 print("\n=== 3. 账号与安全是菜单，服务点进去 ===")
 code, menu = req(follow, "/account")
 check("账号与安全页 200", code == 200, code)
-check("只列两个选项（改密码 / 登录与设备）",
-      menu.count('class="nav-row"') == 2 and 'href="/account/password"' in menu
-      and 'href="/account/sessions"' in menu, menu.count('class="nav-row"'))
+check("列三个选项（改密码 / 登录与设备 / 注销）",
+      menu.count('class="nav-row"') == 3 and 'href="/account/password"' in menu
+      and 'href="/account/sessions"' in menu
+      and 'href="/account/delete"' in menu, menu.count('class="nav-row"'))
 check("菜单页没有密码输入框", 'type="password"' not in menu)
 check("菜单页不再放改名/头像/地区",
       "/profile/username" not in menu and "/profile/avatar" not in menu

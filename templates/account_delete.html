@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}注销账号 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>注销账号</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.account_page') }}"
+         aria-label="返回账号与安全" title="返回账号与安全">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <p class="danger-lead">
+          这一步会把账号 <b>{{ current_user.username }}</b> 和它里面的东西<strong>全部删掉</strong>，
+          删完就没了，也不能恢复。
+        </p>
+        <ul class="plain-list danger-list">
+          <li>谷子 <b>{{ counts.gu_items }}</b> 件（含实物照片 {{ counts.photos }} 张）</li>
+          <li>分类 <b>{{ counts.categories }}</b> 个、再贩提醒 <b>{{ counts.reminders }}</b> 条</li>
+          <li>换谷信息 <b>{{ counts.exchanges }}</b> 条、头像 {{ '1 张' if current_user.avatar else '无' }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.account_delete') }}" id="deleteForm"
+              data-confirm="最后确认一次：真的注销「{{ current_user.username }}」吗？删掉就找不回来了。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <label class="up-field">
+            <span>第 1 步：一字不差地输入你的用户名</span>
+            <input name="username" id="confirmName" maxlength="{{ username_max }}"
+                   autocomplete="off" placeholder="{{ current_user.username }}">
+          </label>
+
+          <label class="up-field">
+            <span>第 2 步：输入当前密码</span>
+            <input type="password" name="password" id="confirmPassword"
+                   autocomplete="current-password" placeholder="当前密码">
+          </label>
+
+          <label class="danger-check">
+            <input type="checkbox" name="agree" value="yes" id="confirmAgree" required>
+            <span>我知道里面的数据会一起没掉，而且恢复不了</span>
+          </label>
+
+          <div class="wx-actions">
+            <button type="submit" class="danger-btn" id="deleteBtn">永久注销这个账号</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="wx-note">
+      三道保险：手打用户名 + 当前密码 + 勾选确认，提交前还会再弹一次确认。
+      只有登录着的人知道密码，光有会话（比如别人借用了你没锁屏的电脑）删不掉。
+    </p>
+    <p class="wx-note">
+      说清楚一件事：备份文件里可能还有你的数据。自动备份存的是**整个数据库的快照**，
+      一步注销不会去动那些文件（它们也包含别人的数据，不能单独挑出来删）。
+      要是你不希望旧备份里留着，就到「数据备份」页让管理员把旧的备份文件删掉。
+    </p>
+    <p class="wx-note">
+      别的账号不受影响：你发的换谷信息会跟着消失，别人的谷子和照片一张都不会动。
+      想留个底可以先在「数据备份」里导出一份 zip 再注销。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

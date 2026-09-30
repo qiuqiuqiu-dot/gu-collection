@@ -196,6 +196,26 @@ a.stat-item span::after{content:"›";margin-left:3px;color:var(--ink-3);opacity
 }
 .more-btn:active{transform:scale(.97);}
 
+/* ============ 注销账号（危险操作） ============ */
+.danger-lead{
+  font-size:13px;line-height:1.75;color:var(--ink-2);margin:2px 2px 10px;
+}
+.danger-lead b{color:var(--ink);}
+.danger-lead strong{color:#C0392B;}
+.danger-list{margin:0 2px;}
+.danger-list li{color:var(--ink-2);}
+.danger-list b{color:var(--ink);}
+.danger-check{
+  display:flex;align-items:flex-start;gap:8px;margin:14px 2px 4px;
+  font-size:12.5px;line-height:1.6;color:var(--ink-2);
+}
+.danger-check input{margin-top:2px;flex:0 0 auto;width:16px;height:16px;accent-color:#C0392B;}
+.danger-btn{
+  width:100%;padding:13px 16px;border:none;border-radius:12px;cursor:pointer;
+  font-size:13.5px;font-weight:700;color:#fff;background-color:#C0392B;
+}
+.danger-btn:active{transform:scale(.98);background-color:#A93226;}
+
 /* ============ 白底列表式页面（参考微信个人资料页） ============ */
 /* 这类页面不要渐变底和光斑，也不要大圆角卡片，就是白底 + 列表 + 细分割线 */
 .phone.plain{background:#fff;}

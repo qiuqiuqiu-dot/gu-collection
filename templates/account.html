@@ -47,6 +47,20 @@
     </section>
 
     <section class="card set-card">
+      <h3>注销</h3>
+      <div class="nav-list">
+        <a class="nav-row" href="{{ url_for('main.account_delete') }}" id="toDelete">
+          <span class="nav-ico">🗑️</span>
+          <span class="nav-text">
+            <b>注销账号</b>
+            <i>删掉账号和里面的全部数据，不可恢复</i>
+          </span>
+          <span class="nav-go">›</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="card set-card">
       <h3>这个程序怎么保护你的账号</h3>
       <ul class="plain-list">
         <li>密码只存散列值（加盐哈希），数据库里没有明文，也没人能反推出来。</li>

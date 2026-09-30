@@ -907,6 +907,50 @@ def _forget_login_fails():
     _LOGIN_FAILS.pop(_login_key(), None)
 
 
+# 「确认当前密码」这类敏感操作的失败计数。**刻意和登录限流分成两套**：
+# 如果共用，攻击者只要拿着偷来的会话狂点「修改密码」，就能把主人锁在登录外面。
+# 这套按「已登录用户 + IP」记，锁住的只是这两个操作本身，不影响登录。
+_CONFIRM_FAILS = {}
+CONFIRM_MAX_FAILS = 8
+CONFIRM_LOCK_SECONDS = 15 * 60
+
+
+def _confirm_key():
+    return f"{current_user.id}|{request.remote_addr}"
+
+
+def _confirm_locked_for():
+    entry = _CONFIRM_FAILS.get(_confirm_key())
+    if not entry:
+        return 0
+    count, last = entry
+    if count < CONFIRM_MAX_FAILS:
+        return 0
+    left = CONFIRM_LOCK_SECONDS - (time.time() - last)
+    return int(left) + 1 if left > 0 else 0
+
+
+def _confirm_password(password):
+    """敏感操作前确认当前密码，并做次数限制。
+
+    返回 (是否通过, 提示语)。被锁的时候即使密码打对了也不放行，
+    否则这个限流就没意义了。
+    """
+    wait = _confirm_locked_for()
+    if wait:
+        return False, f"密码输错太多次，请 {_wait_text(wait)}后再试"
+    if current_user.check_password(password):
+        now = time.time()
+        for key in [k for k, (_n, last) in _CONFIRM_FAILS.items()
+                    if now - last > CONFIRM_LOCK_SECONDS]:
+            _CONFIRM_FAILS.pop(key, None)
+        _CONFIRM_FAILS.pop(_confirm_key(), None)
+        return True, ""
+    count = _CONFIRM_FAILS.get(_confirm_key(), (0, 0))[0]
+    _CONFIRM_FAILS[_confirm_key()] = (count + 1, time.time())
+    return False, "当前密码不对"
+
+
 def _start_session(user):
     """登录成功后：记下这次会话的令牌 + 上次登录时间。"""
     login_user(user)
@@ -1186,8 +1230,9 @@ def account_password():
         old = request.form.get("old_password") or ""
         new = request.form.get("new_password") or ""
         confirm = request.form.get("confirm_password") or ""
-        if not current_user.check_password(old):
-            flash("当前密码不对", "error")
+        ok, message = _confirm_password(old)
+        if not ok:
+            flash(message, "error")
         elif len(new) < PASSWORD_MIN:
             flash(f"新密码至少 {PASSWORD_MIN} 位", "error")
         elif new != confirm:
@@ -1216,6 +1261,79 @@ def account_sessions():
         max_fails=current_app.config["LOGIN_MAX_FAILS"],
         lock_minutes=current_app.config["LOGIN_LOCK_SECONDS"] // 60,
     )
+
+
+@bp.route("/account/delete", methods=["GET", "POST"])
+@login_required
+def account_delete():
+    """注销账号：删掉当前账号和它的全部数据，不可恢复。
+
+    三道保险：手打用户名 + 当前密码 + 勾选确认，外加提交前的一次弹窗。
+    **只删当前登录的账号**——这个接口不接受任何「删谁」的参数，
+    所以不存在「带着自己的会话去删别人的号」这种事。
+    """
+    if request.method == "POST":
+        typed = _clean(request.form.get("username"), USERNAME_MAX)
+        password = request.form.get("password") or ""
+        agreed = request.form.get("agree") == "yes"
+
+        if typed != current_user.username:
+            flash("用户名没对上：要一字不差地输入你自己的用户名", "error")
+        elif not agreed:
+            flash("请先勾选「我知道里面的数据会一起没掉」", "error")
+        else:
+            ok, message = _confirm_password(password)
+            if not ok:
+                flash(message, "error")
+            else:
+                name = current_user.username
+                result = _purge_account(current_user)
+                # 先 flash 再登出：flash 存在 session 里，登出只清登录态，不影响它
+                flash(f"账号「{name}」已注销：谷子 {result['gu_items']} 件、"
+                      f"分类 {result['categories']} 个、提醒 {result['reminders']} 条、"
+                      f"换谷信息 {result['exchanges']} 条、图片 {result['photos']} 张，"
+                      f"全部删除。", "success")
+                logout_user()
+                return redirect(url_for("main.login"))
+
+    return render_template(
+        "account_delete.html",
+        username_max=USERNAME_MAX,
+        counts=_account_counts(current_user),
+    )
+
+
+def _account_counts(user):
+    """注销页上要摆出来的「将失去什么」，图片张数包含头像。
+
+    键名故意不叫 "items"：在 Jinja 模板里 `counts.items` 会解析成 dict 自带的
+    items 方法，渲染出来是一串 built-in method……（这个坑真踩过，测试抓到的）。
+    """
+    photos = sum(1 for i in user.items if i.image)
+    if user.avatar:
+        photos += 1
+    return {"gu_items": user.items.count(),
+            "categories": user.categories.count(),
+            "reminders": user.reminders.count(),
+            "exchanges": user.exchanges.count(),
+            "photos": photos}
+
+
+def _purge_account(user):
+    """删账号 + 它的全部行 + 磁盘上的图片，返回删了多少（用来给个回执）。
+
+    图片必须自己删：数据库级联只带走行，文件留在 static/uploads/ 就是永远没人认领的垃圾。
+    """
+    images = [i.image for i in user.items if i.image]
+    if user.avatar:
+        images.append(user.avatar)
+    result = _account_counts(user)
+    # 四个关系都配了 cascade="all, delete-orphan"，删 user 会一起带走
+    db.session.delete(user)
+    db.session.commit()
+    for name in images:
+        _delete_image(name)
+    return result
 
 
 # ==================== 谷子 CRUD ====================

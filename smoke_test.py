@@ -3168,6 +3168,152 @@ check("筛选条件不会被记住（重新进谷柜还是全部 30 件）",
       "共 30 件" in sx.get("/items").get_data(as_text=True)
       and len(grid_names(sx.get("/items?n=100").get_data(as_text=True))) == 30)
 
+print("\n=== 27. 注销账号：账号和它的数据一起删干净 ===")
+app22 = fresh_app(db_uri("verify_delete.db"), WTF_CSRF_ENABLED=False,
+                  EXCHANGE_ENABLED=True)
+gone = app22.test_client()          # 要被注销的那个
+keep = app22.test_client()          # 旁观者：它的数据一张都不能少
+gone.post("/register", data={"username": "gone_user", "password": "abc123"})
+keep.post("/register", data={"username": "keep_user", "password": "abc123"})
+
+gone.post("/categories/add", data={"kind": "type", "name": "吧唧"})
+gone.post("/categories/add", data={"kind": "ip", "name": "某某"})
+gone.post("/profile/signature", data={"signature": "待注销", "next": "/profile"})
+gone.post("/profile/avatar",
+          data={"avatar": (make_image("PNG"), "me.png"), "next": "/profile"},
+          content_type="multipart/form-data")
+gone.post("/items/add", data={"name": "带图的谷子", "count": "2",
+                              "status": "displaying",
+                              "image": (make_image(), "a.png")},
+          content_type="multipart/form-data")
+gone.post("/items/add", data={"name": "没图的谷子", "count": "1",
+                              "status": "transit"})
+gone.post("/reminders/add", data={"title": "再贩提醒", "event_time": "2099-01-01T10:00",
+                                  "priority": "hot"})
+gone.post("/exchanges/add", data={"title": "求换 已注销用户的", "distance_km": "1"})
+keep.post("/items/add", data={"name": "旁观者的谷子", "count": "3",
+                             "status": "displaying",
+                             "image": (make_image(), "keep.png")},
+          content_type="multipart/form-data")
+
+with app22.app_context():
+    gone_u = User.query.filter_by(username="gone_user").first()
+    gone_id = gone_u.id
+    gone_avatar = gone_u.avatar
+    gone_photos = [i.image for i in gone_u.items if i.image]
+    keep_u = User.query.filter_by(username="keep_user").first()
+    keep_photo = keep_u.items.first().image
+    counts_before = (gone_u.items.count(), gone_u.categories.count(),
+                     gone_u.reminders.count(), gone_u.exchanges.count())
+    keep_counts = (keep_u.items.count(), keep_u.categories.count())
+up_dir = app22.config["UPLOAD_FOLDER"]
+check("准备：注销前确实有数据（2 件谷子 / 2 个分类 / 1 提醒 / 1 换谷 + 头像 1 张）",
+      counts_before == (2, 2, 1, 1) and bool(gone_avatar),
+      (counts_before, gone_avatar))
+check("准备：图片都真的落盘了",
+      all(os.path.exists(os.path.join(up_dir, n))
+          for n in gone_photos + [gone_avatar, keep_photo]))
+
+# --- 入口与页面 ---
+check("匿名进不了注销页", app22.test_client().get("/account/delete").status_code == 302)
+check("匿名也注销不了（POST 被挡）",
+      app22.test_client().post("/account/delete", data={}).status_code == 302)
+check("账号与安全页里有注销入口",
+      'id="toDelete"' in gone.get("/account").get_data(as_text=True)
+      and 'href="/account/delete"' in gone.get("/account").get_data(as_text=True))
+del_page = gone.get("/account/delete").get_data(as_text=True)
+check("注销页有三道保险的控件（用户名 / 密码 / 勾选）",
+      'id="confirmName"' in del_page and 'id="confirmPassword"' in del_page
+      and 'id="confirmAgree"' in del_page)
+check("注销页有提交前的二次确认弹窗",
+      "data-confirm=" in del_page and "找不回来" in del_page)
+check("注销页摆明了会失去什么（件数写出来）",
+      "谷子 <b>2</b> 件" in del_page and "换谷信息 <b>1</b> 条" in del_page, del_page[:0])
+check("注销页写明了备份文件里可能还有数据（不含糊其辞）",
+      "备份文件里可能还有你的数据" in del_page)
+check("注销页说明了不影响别的账号", "别人的谷子和照片一张都不会动" in del_page)
+
+# --- 三道保险，缺一不可 ---
+def attempt(name, **data):
+    """带完整表单试一次注销，返回 (状态码, 提示语)。"""
+    payload = {"username": "gone_user", "password": "abc123", "agree": "yes"}
+    payload.update(data)
+    r = gone.post("/account/delete", data=payload)
+    # 被拒时是当场渲染（不跳转），提示就在这次响应里，不能再 GET 一次去拿
+    return r.status_code, r.get_data(as_text=True)
+
+
+def still_there():
+    with app22.app_context():
+        u = User.query.filter_by(username="gone_user").first()
+        return u is not None and u.items.count() == 2
+
+
+code, page = attempt("用户名打错", username="Gone_User")
+check("用户名打错 → 拒绝，且什么都没删",
+      "用户名没对上" in page and still_there())
+code, page = attempt("用户名空着", username="")
+check("用户名空着 → 拒绝", "用户名没对上" in page and still_there())
+code, page = attempt("没勾选确认", agree="")
+check("没勾选「我知道」→ 拒绝", "请先勾选" in page and still_there())
+code, page = attempt("密码打错", password="wrong-password")
+check("密码不对 → 拒绝，且什么都没删",
+      "当前密码不对" in page and still_there())
+check("被拒之后账号还能正常用（没被半路删坏）",
+      gone.get("/items").status_code == 200)
+
+# 光有会话、不知道密码的人删不掉：这正是要验的
+for _ in range(routes.CONFIRM_MAX_FAILS + 1):
+    attempt("连错", password="nope")
+code, page = attempt("锁住之后连对的密码也不放行", password="abc123")
+check("输错太多次后，即使密码打对了也不放行", "密码输错太多次" in page
+      and still_there(), page[:0])
+# 把限流清掉，继续测真正的注销
+routes._CONFIRM_FAILS.clear()
+
+# --- 真的注销 ---
+code, page = attempt("完整三步")
+with app22.app_context():
+    left = (User.query.filter_by(username="keep_user").first().items.count(),
+            User.query.filter_by(username="keep_user").first().categories.count())
+check("完整三步：注销请求被接受（302 跳走登录页）", code == 302, code)
+with app22.app_context():
+    check("注销后库里查不到这个账号",
+          User.query.filter_by(username="gone_user").first() is None)
+    check("它的谷子 / 分类 / 提醒 / 换谷信息一起删干净",
+          GuItem.query.filter_by(user_id=gone_id).count() == 0
+          and Category.query.filter_by(user_id=gone_id).count() == 0
+          and Reminder.query.filter_by(user_id=gone_id).count() == 0
+          and Exchange.query.filter_by(user_id=gone_id).count() == 0)
+check("磁盘上的谷子照片和头像也删了（不留垃圾）",
+      not any(os.path.exists(os.path.join(up_dir, n))
+              for n in gone_photos + [gone_avatar]),
+      [n for n in gone_photos + [gone_avatar]
+       if os.path.exists(os.path.join(up_dir, n))])
+check("同一个库里的其它图片一张没动",
+      os.path.exists(os.path.join(up_dir, keep_photo)))
+check("别的账号的数据分毫未动", left == keep_counts == (1, 0), (left, keep_counts))
+
+# --- 注销之后：登录态没了，旧密码也进不来 ---
+check("注销后原来的登录态失效了（回首页被踢去登录）",
+      gone.get("/").status_code == 302)
+check("注销后连注销页都进不去了", gone.get("/account/delete").status_code == 302)
+login_try = app22.test_client()
+r = login_try.post("/login", data={"username": "gone_user", "password": "abc123"})
+check("用原来的用户名密码登录不上（账号真的没了）",
+      r.status_code == 200 and "用户名或密码错误" in r.get_data(as_text=True))
+check("注销页上那股连错密码的计数不会牵连登录（旁观者照样能登）",
+      keep.get("/account/delete").status_code == 200)
+
+# --- 空账号（什么都没有）也能注销，不报错 ---
+empty = app22.test_client()
+empty.post("/register", data={"username": "empty_user", "password": "abc123"})
+empty.post("/account/delete", data={"username": "empty_user", "password": "abc123",
+                                    "agree": "yes"})
+with app22.app_context():
+    check("没有数据的账号也能顺利注销",
+          User.query.filter_by(username="empty_user").first() is None)
+
 print("\n" + "=" * 46)
 if FAILS:
     print(f"❌ {len(FAILS)} 项失败：")

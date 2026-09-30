@@ -465,6 +465,45 @@ pending.push((async () => {
   check("签名页无 JS 报错", env.pageErrors.length === 0, env.pageErrors.join(" | "));
 }
 
+/* ---------- 注销账号：危险页面的三道保险 ---------- */
+{
+  const env = load("s_account_delete.html", "http://127.0.0.1:5000/account/delete");
+  const doc = env.window.document;
+  const win = env.window;
+  const form = doc.querySelector("#deleteForm");
+  const nameInput = doc.querySelector("#confirmName");
+  const pwdInput = doc.querySelector("#confirmPassword");
+  const agree = doc.querySelector("#confirmAgree");
+
+  check("注销页是白底 + 返回账号与安全",
+    !!doc.querySelector(".phone.plain")
+    && doc.querySelector(".back-btn").getAttribute("href") === "/account");
+  check("要手打用户名（输入框提示就是自己的用户名）",
+    !!nameInput && (nameInput.getAttribute("placeholder") || "").length > 0);
+  check("密码框是 password 类型（不明文显示）",
+    pwdInput && pwdInput.getAttribute("type") === "password");
+  check("确认框默认是没勾的，而且浏览器层面就要求勾上",
+    agree && !agree.checked && agree.hasAttribute("required"));
+  check("注销按钮是危险样式，不是平时的绿色按钮",
+    !!doc.querySelector("#deleteBtn") && doc.querySelector("#deleteBtn")
+      .classList.contains("danger-btn"));
+  check("表单带二次确认提示语", form.hasAttribute("data-confirm")
+    && form.getAttribute("data-confirm").indexOf("找不回来") >= 0);
+  check("页面上写出了会失去什么", doc.body.textContent.indexOf("会一起没掉") >= 0);
+  check("页面上说清楚了备份里可能还有数据（不糊弄）",
+    doc.body.textContent.indexOf("备份文件里可能还有你的数据") >= 0);
+
+  // 二次确认真的拦得住：confirm 返回 false 时提交要被取消
+  win.confirm = () => false;
+  const blocked = form.dispatchEvent(new win.Event("submit", { cancelable: true }));
+  check("确认框点「取消」时，提交被拦下（事件被 preventDefault）", blocked === false,
+    blocked);
+  win.confirm = () => true;
+  const allowed = form.dispatchEvent(new win.Event("submit", { cancelable: true }));
+  check("确认框点「确定」时就不再拦（交给浏览器继续提交）", allowed === true, allowed);
+  check("注销页无 JS 报错", env.pageErrors.length === 0, env.pageErrors.join(" | "));
+}
+
 /* ---------- 账号与数据：独立一页，只有两块入口 ---------- */
 {
   const env = load("s_account_data.html", "http://127.0.0.1:5000/account-data");
@@ -488,12 +527,13 @@ pending.push((async () => {
 {
   const env = load("s_account.html", "http://127.0.0.1:5000/account");
   const doc = env.window.document;
-  check("账号与安全只列两个选项",
-    doc.querySelectorAll(".nav-row").length === 2,
+  check("账号与安全列三个选项（改密码 / 登录与设备 / 注销）",
+    doc.querySelectorAll(".nav-row").length === 3,
     doc.querySelectorAll(".nav-row").length);
-  check("两个选项分别指向改密码和登录与设备",
+  check("三个选项分别指向改密码、登录与设备、注销",
     !!doc.querySelector('a[href="/account/password"]')
-    && !!doc.querySelector('a[href="/account/sessions"]'));
+    && !!doc.querySelector('a[href="/account/sessions"]')
+    && !!doc.querySelector('a[href="/account/delete"]'));
   check("菜单页上没有密码输入框（点进去才做事）",
     !doc.querySelector('input[type="password"]'));
   check("返回按钮回账号与数据页",
