@@ -198,10 +198,15 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         tree = data;
-        // 服务端已经把当前值和选项渲染好了，这里只补上「换国家时也能用」的联动
+        // 服务端已经把当前值和选项渲染好了，这里只补上「换国家时也能用」的联动。
+        // 注意：syncFrom('province') 会顺手把区/县下拉清空，
+        // 所以两个值必须在动手之前先读出来——不然第二次读到的已经是被清掉后的空串，
+        // 表现就是「存了区县、回到这页区县却没选上」。
         if (sel.country.value !== MANUAL) {
-          syncFrom('province', sel.city.value);
-          syncFrom('city', sel.area.value);
+          var keepCity = sel.city.value;
+          var keepArea = sel.area.value;
+          syncFrom('province', keepCity);
+          syncFrom('city', keepArea);
         }
         sel.country.dataset.ready = '1';
       })

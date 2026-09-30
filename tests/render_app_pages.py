@@ -75,6 +75,14 @@ save(os.path.join(BUILD_DIR, "s_account_sessions.html"), "/account/sessions")
 save(os.path.join(BUILD_DIR, "s_profile.html"), "/profile")
 save(os.path.join(BUILD_DIR, "s_profile_avatar.html"), "/profile/avatar")
 save(os.path.join(BUILD_DIR, "s_profile_username.html"), "/profile/username")
+# 地区页要连「已经选到区/县」的样子一起渲染出来（s_profile_region_saved）：
+# 页面上的四级联动 JS 会在加载后重填下拉，很容易把服务端预选的区/县冲掉，
+# 只有渲染一个「本来就有值」的页面才测得到。
+c.post("/profile/region", data={"country": "中国", "province": "广东省",
+                                "city": "深圳市", "area": "南山区",
+                                "next": "/profile"})
+save(os.path.join(BUILD_DIR, "s_profile_region_saved.html"), "/profile/region")
+c.post("/profile/region", data={"country": "", "next": "/profile"})   # 清回去
 save(os.path.join(BUILD_DIR, "s_profile_region.html"), "/profile/region")
 save(os.path.join(BUILD_DIR, "s_profile_signature.html"), "/profile/signature")
 save(os.path.join(BUILD_DIR, "s_backup.html"), "/backup")

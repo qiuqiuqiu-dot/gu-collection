@@ -342,6 +342,42 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
   check("名字编辑页无 JS 报错", env.pageErrors.length === 0, env.pageErrors.join(" | "));
 }
 
+/* ---------- 地区页：已经存了区/县时，四级下拉要显示成已选 ---------- */
+pending.push((async () => {
+  const TREE = { "中国": { "广东省": { "深圳市": ["南山区", "福田区"] },
+                           "上海市": { "市辖区": ["徐汇区", "静安区"] } } };
+  const env = load("s_profile_region_saved.html",
+    "http://127.0.0.1:5000/profile/region", { tree: TREE });
+  const doc = env.window.document;
+  const $ = (s) => doc.querySelector(s);
+
+  check("存过地区后，国家/省/市/区/县都预选上了（服务端渲染）",
+    $(".phone.plain") && $("select[name=country]").value === "中国"
+    && $("select[name=province]").value === "广东省"
+    && $("select[name=city]").value === "深圳市"
+    && $("select[name=area]").value === "南山区",
+    [$("select[name=country]").value, $("select[name=province]").value,
+     $("select[name=city]").value, $("select[name=area]").value]);
+
+  await flush();      // 等页面里那个 fetch 的微任务跑完（联动会重填下拉）
+
+  check("四级联动跑过之后，区/县仍然是选中的（不能被冲成「不选」）",
+    $("select[name=area]").value === "南山区",
+    `area=${$("select[name=area]").value}`);
+  check("联动跑过之后省市也没被冲掉",
+    $("select[name=province]").value === "广东省"
+    && $("select[name=city]").value === "深圳市",
+    [$("select[name=province]").value, $("select[name=city]").value]);
+  check("区/县下拉里确实列出了这个市的所有区",
+    [...$("select[name=area]").options].map((o) => o.value)
+      .join(",") === ",南山区,福田区",
+    [...$("select[name=area]").options].map((o) => o.value));
+  check("已存地区时手动填写框是收起的",
+    doc.querySelector("#wrapManual").hidden);
+  check("地区页（已存区县）无 JS 报错",
+    env.pageErrors.length === 0, env.pageErrors.join(" | "));
+})());
+
 /* ---------- 地区选择页：国家 → 省 → 市 → 区/县 四级联动 ---------- */
 pending.push((async () => {
   const TREE = { "中国": { "广东省": { "深圳市": ["南山区", "福田区"] },

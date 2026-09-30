@@ -267,6 +267,13 @@ code, page = req(follow, "/profile/region")
 check("页面提示了设置成功", "地区已设为「广东 深圳 南山」" in flash_in(page))
 check("个人信息页那一行也显示它",
       "广东 深圳 南山" in req(follow, "/profile")[1])
+# 保存完回到这一页，四级下拉必须都还是选中的（页面上那段联动 JS 容易把区/县冲掉）
+code, back = req(follow, "/profile/region")
+check("存完之后回到地区页，省/市/区/县四级都是「已选中」",
+      re.search(r'<option value="广东省"\s+selected', back) is not None
+      and re.search(r'<option value="深圳市"\s+selected', back) is not None
+      and re.search(r'<option value="南山区"\s+selected', back) is not None,
+      [x.strip() for x in back.splitlines() if "selected" in x][:4])
 
 code, _ = req(plain, "/profile/region",
               {"country": "中国", "province": "广东省", "city": "深圳市",
