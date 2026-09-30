@@ -1,0 +1,10 @@
+{# 谷柜页的分组切换条——默认「全部」，再按品类/作品IP 看。
+   用 request.endpoint 生成链接，切换后仍留在谷柜页；
+   选中的方式存进 session，翻页也记得。 #}
+<div class="seg-row">
+  {% for mode in group_modes %}
+  <a class="seg-btn{% if group == mode %} active{% endif %}"
+     href="{{ url_for(request.endpoint, group=mode) }}">{{ group_labels[mode] }}</a>
+  {% endfor %}
+  {% include "_cat_manage.html" %}
+</div>

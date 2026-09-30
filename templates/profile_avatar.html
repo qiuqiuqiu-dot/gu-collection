@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}修改头像 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>修改头像</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.profile_page') }}"
+         aria-label="返回个人信息" title="返回个人信息">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <div class="wx-group">
+      <div class="wx-form" style="text-align:center">
+        <div class="avatar" style="margin:6px auto 4px">
+          {% if current_user.avatar %}
+          <img id="avatarImg" src="{{ url_for('static', filename='uploads/' ~ current_user.avatar) }}"
+               alt="{{ current_user.username }} 的头像">
+          {% else %}
+          <span id="avatarFallback">{{ (current_user.username or '谷')[0] | upper }}</span>
+          {% endif %}
+        </div>
+        <p class="wx-note" style="margin:8px 2px 0">
+          不传就显示用户名首字。png / jpg / gif / webp，5MB 内。
+        </p>
+      </div>
+    </div>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_avatar') }}"
+              enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <label class="up-field">
+            <span>选择图片</span>
+            <input type="file" name="avatar" id="avatarInput" data-preview="avatarPreview"
+                   accept="image/png,image/jpeg,image/gif,image/webp" required>
+          </label>
+          <img id="avatarPreview" class="up-preview" alt="头像预览" hidden>
+          <div class="wx-actions">
+            <button type="submit" class="set-btn primary" id="avatarSaveBtn">保存头像</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if current_user.avatar %}
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_avatar') }}"
+              data-confirm="删除当前头像？">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="remove_avatar" value="1">
+          <div class="wx-actions">
+            <button type="submit" class="set-btn danger" id="avatarRemoveBtn">删除头像</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <p class="wx-note">改完立刻生效，首页顶栏上的头像也会跟着变。</p>
+
+  </div>
+</div>
+{% endblock %}

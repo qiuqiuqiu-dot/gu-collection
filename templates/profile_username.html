@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}修改名字 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>修改名字</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.profile_page') }}"
+         aria-label="返回个人信息" title="返回个人信息">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_username') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <label class="up-field">
+            <span>新名字（{{ username_min }}-{{ username_max }} 个字符）</span>
+            <input name="username" id="newUsername" maxlength="{{ username_max }}"
+                   autocomplete="off" required
+                   placeholder="当前：{{ current_user.username }}">
+          </label>
+          <div class="wx-actions">
+            <button type="submit" class="set-btn primary" id="renameBtn">改用户名</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="wx-note">
+      这个名字就是登录名。改了只影响登录，谷子、分类、提醒都跟着账号走，不会丢。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{# 统一的「+」：先问要添加什么，再打开对应的表单。
+   所有页面都 include 这一个文件，所以在途 / 心愿单 / 提醒 / 换谷在任何页面都能直接加，
+   不用先跑去另一个页面把状态改成想要的那个。
+
+   注意：下面几个弹窗的 id（addModal / reminderModal / exchangeModal / catModal）
+   必须全站唯一，所以它们只在这里 include 一次，页面别再单独 include。 #}
+<button class="fab" type="button" aria-label="添加"
+        data-modal-open="addSheet">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+       aria-hidden="true">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+</button>
+
+<div class="modal" id="addSheet">
+  <div class="modal-mask" data-modal-close="addSheet"></div>
+  <div class="modal-card sheet-card" role="dialog" aria-modal="true"
+       aria-labelledby="addSheetTitle">
+    <h3 id="addSheetTitle">要添加什么？</h3>
+
+    <div class="sheet-list">
+      {# 前四个都是同一张谷子表单，只是进来时把状态预设好 #}
+      <button type="button" class="sheet-item" data-add-kind="displaying">
+        <span class="sheet-ico">🧸</span>
+        <span class="sheet-text">
+          <b>谷子</b><i>已经在手里的，进谷柜展出</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+
+      <button type="button" class="sheet-item" data-add-kind="in_transit">
+        <span class="sheet-ico">🚚</span>
+        <span class="sheet-text">
+          <b>在途</b><i>还没到货，先记下等它到</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+
+      <button type="button" class="sheet-item" data-add-kind="sold">
+        <span class="sheet-ico">💰</span>
+        <span class="sheet-text">
+          <b>已出</b><i>出掉的，记下成交价和出手方式</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+
+      <button type="button" class="sheet-item" data-add-kind="wishlist">
+        <span class="sheet-ico">⭐</span>
+        <span class="sheet-text">
+          <b>心愿单</b><i>想要的，先记着，不占谷柜</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+
+      {# 后两个各走自己的弹窗，data-modal-open 由各自的脚本接管（顺序还是新增） #}
+      <button type="button" class="sheet-item"
+              data-modal-open="reminderModal" data-reminder-mode="add">
+        <span class="sheet-ico">🔔</span>
+        <span class="sheet-text">
+          <b>再贩提醒</b><i>记下哪天再贩，到点来抢</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+
+      {# 换谷功能关掉时这一项不出现（见 routes.EXCHANGE_ENABLED） #}
+      {% if exchange_enabled %}
+      <button type="button" class="sheet-item"
+              data-modal-open="exchangeModal" data-exchange-mode="add">
+        <span class="sheet-ico">🔄</span>
+        <span class="sheet-text">
+          <b>换谷信息</b><i>求换什么、在哪面交</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+      {% endif %}
+
+      {# 分类管理不是「记一条数据」，用一条分隔线隔开，免得和上面几种混在一起 #}
+      <p class="sheet-sep"><span>分类不够用？</span></p>
+
+      <button type="button" class="sheet-item is-manage"
+              data-modal-open="catModal">
+        <span class="sheet-ico">🏷️</span>
+        <span class="sheet-text">
+          <b>分类管理</b><i>加周边品类 / 作品IP，也能删掉不要的</i>
+        </span>
+        <span class="sheet-go">›</span>
+      </button>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" data-modal-close="addSheet">取消</button>
+    </div>
+  </div>
+</div>
+
+{% include "_add.html" %}
+{% include "_reminder_modal.html" %}
+{% if exchange_enabled %}{% include "_exchange_modal.html" %}{% endif %}
+{% include "_cats.html" %}

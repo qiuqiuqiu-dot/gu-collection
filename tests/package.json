@@ -1,0 +1,11 @@
+{
+  "name": "gu-app-tests",
+  "private": true,
+  "description": "谷仓的 DOM/交互测试（jsdom）。跑之前先 npm install。",
+  "scripts": {
+    "test": "node test_dom_exchange_board.js && node test_dom_add_sheet.js && node test_dom_ui_and_settings.js"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

@@ -1,0 +1,44 @@
+{# 再贩提醒的添加/编辑弹窗（共用一个表单，由 JS 切换标题和 action）
+   需要上下文里的 priorities。 #}
+<div class="modal" id="reminderModal">
+  <div class="modal-mask" data-modal-close="reminderModal"></div>
+  <form class="modal-card" id="reminderForm" method="post"
+        action="{{ url_for('main.add_reminder') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <h3 id="reminderFormTitle">添加再贩提醒</h3>
+
+    <label class="up-field">
+      <span>提醒内容（必填）</span>
+      <input name="title" id="remTitle" maxlength="80" required
+             placeholder="如：星野系列 亚克力立牌 再贩">
+    </label>
+    <label class="up-field">
+      <span>时间（必填）</span>
+      <input type="datetime-local" name="event_time" id="remTime" required>
+    </label>
+    <label class="up-field">
+      <span>重要程度</span>
+      <select name="priority" id="remPriority">
+        {% for key, label in priorities.items() %}
+        <option value="{{ key }}"{% if key == 'normal' %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="up-field">
+      <span>说明</span>
+      <input name="subtitle" id="remSubtitle" maxlength="120"
+             placeholder="选填，如「官方再贩」「预约开启」">
+    </label>
+    <label class="up-field">
+      <span>抢购链接或店铺</span>
+      <input name="link" id="remLink" maxlength="255"
+             placeholder="选填，填链接或店铺名都行">
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" data-modal-close="reminderModal">取消</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+</div>

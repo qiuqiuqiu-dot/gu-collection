@@ -1,0 +1,50 @@
+{# 换谷板（/exchanges 页用，谷友互看）
+   需要上下文里的 exchanges（已排序）和 current_user。
+   我发的显示「我发的」并带编辑/撤下；别人发的只读。 #}
+{% for ex in exchanges %}
+{% set mine = ex.user_id == current_user.id %}
+{# 同城按「省 + 市」算，不按整串——区/县不同也算同城 #}
+{% set same = (not mine) and same_city(current_user.region, ex.region) %}
+<div class="side-item{% if mine %} is-mine{% endif %}"
+     data-exchange-id="{{ ex.id }}"
+     data-title="{{ ex.title }}"
+     data-want="{{ ex.want or '' }}"
+     data-emoji="{{ ex.emoji }}"
+     data-distance="{{ '%g'|format(ex.distance_km) }}"
+     data-place="{{ ex.place or '' }}"
+     data-contact="{{ ex.contact or '' }}"
+     data-note="{{ ex.note or '' }}"
+     {% if mine %}data-edit-url="{{ url_for('main.edit_exchange', exchange_id=ex.id) }}"{% endif %}>
+  <div class="s-thumb"
+       style="background:linear-gradient(145deg,{{ ex.color_start }},{{ ex.color_end }})">
+    <span>{{ ex.emoji }}</span>
+  </div>
+
+  <div class="s-body">
+    <p class="s-name">{{ ex.title }}</p>
+    {% if ex.detail_text %}<span class="s-src">{{ ex.detail_text }}</span>{% endif %}
+    {% if ex.contact_text %}<span class="s-meta">{{ ex.contact_text }}</span>{% endif %}
+  </div>
+
+  <div class="s-right">
+    {% if mine %}
+    <span class="s-pill want-normal">我发的</span>
+    <div class="r-acts">
+      <button type="button" class="r-act" data-exchange-edit="{{ ex.id }}"
+              title="编辑这条换谷信息">编辑</button>
+      <form method="post"
+            action="{{ url_for('main.delete_exchange', exchange_id=ex.id) }}"
+            data-confirm="撤下「{{ ex.title }}」？">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button type="submit" class="r-act" title="撤下这条信息">撤下</button>
+      </form>
+    </div>
+    {% else %}
+    <span class="s-pill {% if same %}want-normal{% else %}want-none{% endif %}">
+      {% if same %}同城{% else %}{{ ex.region or "未填地区" }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}

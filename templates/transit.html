@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}在途 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>在途</h1>
+        <p>
+          {% if total_items %}
+          {{ total_items }} 件在路上{% if stats.transit_amount %} · 合计 ¥{{ '{:,.2f}'.format(stats.transit_amount) }}{% endif %}{% if stats.transit_overdue %} · <b class="warn-text">{{ stats.transit_overdue }} 件超期</b>{% endif %}
+          {% else %}
+          暂时没有在途的谷子
+          {% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {% if transit %}
+    <p class="transit-hint">按预计到货从近到远排；超期的排在最前面。「确认到货」会把状态改成展示中。</p>
+    {% include "_transit_list.html" %}
+    {% else %}
+    <div class="empty">
+      还没有在途的谷子。<br>
+      记一件在路上等它到，填上预计到货日期就能在这里看到。
+      <button type="button" class="link-btn" data-add-kind="in_transit">
+        ＋ 记一件在途的谷子
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+  {% include "_viewer.html" %}
+
+</div>
+{% endblock %}

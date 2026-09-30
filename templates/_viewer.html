@@ -1,0 +1,187 @@
+{# 谷子详情弹窗：查看态 ↔ 编辑态，内容由 JS 按被点击卡片的 data-* 填充。
+   仪表盘和 /items 谷柜页共用，所以里面的元素 id 在整页里必须唯一。 #}
+<div class="modal" id="viewModal">
+  <div class="modal-mask" data-modal-close="viewModal"></div>
+  <div class="modal-card viewer-card" role="dialog" aria-modal="true"
+       aria-labelledby="viewerName">
+
+    <!-- 查看态 -->
+    <div id="viewerRead">
+      <a class="viewer-shot" id="viewerLink" target="_blank" rel="noopener"
+         title="在新标签页看原图">
+        <img id="viewerImg" alt="" hidden>
+        <span id="viewerEmoji" hidden></span>
+      </a>
+      <h3 id="viewerName">—</h3>
+      <div class="viewer-tags">
+        <span class="v-chip" id="viewerStatus">—</span>
+        <span class="v-chip mute" id="viewerCount">—</span>
+      </div>
+      <dl class="viewer-info">
+        <div><dt>周边品类</dt><dd id="viewerCatType">—</dd></div>
+        <div><dt>作品IP</dt><dd id="viewerCatIP">—</dd></div>
+        {# 下面这些有值才显示，由 JS 按 data-* 决定 hidden #}
+        <div id="rowCount" hidden><dt>件数</dt><dd id="viewerCountText">—</dd></div>
+        <div id="rowPrice" hidden><dt>入手价</dt><dd id="viewerPrice">—</dd></div>
+        <div id="rowSoldPrice" hidden><dt>成交价</dt><dd id="viewerSoldPrice">—</dd></div>
+        <div id="rowProfit" hidden><dt>盈亏</dt><dd id="viewerProfit">—</dd></div>
+        <div id="rowSoldSource" hidden><dt>出手</dt><dd id="viewerSoldSource">—</dd></div>
+        <div id="rowSoldAt" hidden><dt>出手日期</dt><dd id="viewerSoldAt">—</dd></div>
+        <div id="rowWant" hidden><dt>心愿</dt><dd id="viewerWant">—</dd></div>
+        <div id="rowWantLink" hidden><dt>参考</dt><dd id="viewerWantLink">—</dd></div>
+        <div id="rowWantNote" hidden><dt>备注</dt><dd id="viewerWantNote">—</dd></div>
+        <div id="rowChannel" hidden><dt>购买渠道</dt><dd id="viewerChannel">—</dd></div>
+        <div id="rowOrderNo" hidden><dt>订单号</dt><dd id="viewerOrderNo">—</dd></div>
+        <div id="rowExpect" hidden><dt>预计到货</dt><dd id="viewerExpect">—</dd></div>
+        <div id="rowArrived" hidden><dt>到货时间</dt><dd id="viewerArrived">—</dd></div>
+        <div><dt>添加时间</dt><dd id="viewerTime">—</dd></div>
+      </dl>
+      <div class="modal-actions">
+        <button type="button" id="viewerEditBtn">编 辑</button>
+        <button type="button" data-modal-close="viewModal">关 闭</button>
+      </div>
+    </div>
+
+    <!-- 编辑态：action 由 JS 按卡片的 data-edit-url 设置 -->
+    <form id="editForm" method="post" enctype="multipart/form-data" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <h3>编辑谷子</h3>
+      <img id="editPreview" class="up-preview" alt="图片预览" hidden>
+      <label class="up-field">
+        <span>换一张照片（可选，png / jpg / gif / webp，5MB 内）</span>
+        <input type="file" name="image" data-preview="editPreview"
+               accept="image/png,image/jpeg,image/gif,image/webp">
+      </label>
+      <label class="up-check" id="editRemoveWrap" hidden>
+        <input type="checkbox" name="remove_image" value="1">
+        <span>删除当前照片</span>
+      </label>
+      <input name="name" id="editName" placeholder="谷子名称（必填）"
+             maxlength="64" required>
+      <input name="emoji" id="editEmoji" placeholder="Emoji（没照片时显示）" maxlength="8">
+      <label class="up-field">
+        <span>数量（总数）</span>
+        <input name="count" id="editCount" type="number" min="1" max="9999"
+               inputmode="numeric" placeholder="数量">
+      </label>
+      <label class="up-field">
+        <span>已出数量（部分出掉时填）</span>
+        <input name="sold_count" id="editSoldCount" type="number" min="0" max="9999"
+               inputmode="numeric" placeholder="默认 0">
+      </label>
+      <select name="status" id="editStatus">
+        <option value="displaying">展示中</option>
+        <option value="in_transit">在途</option>
+        <option value="sold">已出</option>
+        <option value="wishlist">心愿单</option>
+      </select>
+
+      {# 在途专属字段：改状态为「在途」时才展开 #}
+      <div class="status-fields" data-status-fields="in_transit" id="editTransitFields">
+        <label class="up-field">
+          <span>预计到货日期</span>
+          <input type="date" name="expect_date" id="editExpect">
+        </label>
+        <label class="up-field">
+          <span>购买渠道</span>
+          <select name="channel" id="editChannel">
+            <option value="">未填写</option>
+            {% for key, label in channels.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="up-field">
+          <span>订单号 / 物流单号</span>
+          <input name="order_no" id="editOrderNo" maxlength="64"
+                 autocomplete="off" placeholder="选填">
+        </label>
+      </div>
+
+      {# 已出专属字段：改状态为「已出」时才展开 #}
+      <div class="status-fields" data-status-fields="sold" id="editSoldFields">
+        <label class="up-field">
+          <span>成交价（元）</span>
+          <input name="sold_price" id="editSoldPrice" inputmode="decimal"
+                 autocomplete="off" placeholder="选填">
+        </label>
+        <label class="up-field">
+          <span>出手方式</span>
+          <select name="sold_method" id="editSoldMethod">
+            <option value="">未填写</option>
+            {% for key, label in sold_methods.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="up-field">
+          <span>出手平台</span>
+          <select name="sold_channel" id="editSoldChannel">
+            <option value="">未填写</option>
+            {% for key, label in sale_channels.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="up-field">
+          <span>出手日期</span>
+          <input type="date" name="sold_at" id="editSoldAt">
+        </label>
+      </div>
+
+      {# 心愿单专属字段：改状态为「心愿单」时才展开 #}
+      <div class="status-fields" data-status-fields="wishlist" id="editWishFields">
+        <label class="up-field">
+          <span>想要程度</span>
+          <select name="want_level" id="editWantLevel">
+            <option value="">未分级</option>
+            {% for key, label in want_levels.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="up-field">
+          <span>预算价（元）</span>
+          <input name="budget" id="editBudget" inputmode="decimal"
+                 autocomplete="off" placeholder="选填">
+        </label>
+        <label class="up-field">
+          <span>参考链接或店铺</span>
+          <input name="want_link" id="editWantLink" maxlength="255"
+                 autocomplete="off" placeholder="选填">
+        </label>
+        <label class="up-field">
+          <span>备注</span>
+          <input name="want_note" id="editWantNote" maxlength="120"
+                 autocomplete="off" placeholder="选填">
+        </label>
+      </div>
+
+      <label class="up-field">
+        <span>入手价（元，选填；已出时用来算盈亏）</span>
+        <input name="price" id="editPrice" inputmode="decimal"
+               autocomplete="off" placeholder="选填">
+      </label>
+      <label class="up-field">
+        <span>周边品类</span>
+        <select name="category_type_id" id="editCatType" data-cat-select="type">
+          <option value="">未分类</option>
+          {% for c in cats_type %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="up-field">
+        <span>作品IP</span>
+        <select name="category_ip_id" id="editCatIP" data-cat-select="ip">
+          <option value="">未分类</option>
+          {% for c in cats_ip %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="editCancel">取 消</button>
+        <button type="submit" class="primary">保 存</button>
+      </div>
+    </form>
+
+  </div>
+</div>

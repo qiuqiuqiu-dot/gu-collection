@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}修改签名 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>修改签名</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.profile_page') }}"
+         aria-label="返回个人信息" title="返回个人信息">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_signature') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <label class="up-field">
+            <span>一句话介绍自己（最多 {{ signature_max }} 个字）</span>
+            <input name="signature" id="signatureInput" maxlength="{{ signature_max }}"
+                   value="{{ current_user.signature or '' }}" autocomplete="off"
+                   placeholder="如：只收原画 / 专收某某吧唧">
+          </label>
+          <div class="wx-actions">
+            <button type="submit" class="set-btn primary" id="signatureSaveBtn">保存签名</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="wx-note">
+      签名会显示在首页问候语下面，清空保存就是删掉签名。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

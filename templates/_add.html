@@ -1,0 +1,146 @@
+{# 添加谷子的表单弹窗（谷柜 / 在途 / 已出 / 心愿单共用这一张，靠状态字段区分）。
+   入口在 _add_sheet.html：从统一 + 号里选了这四种之一才会打开这里。 #}
+<div class="modal" id="addModal">
+  <div class="modal-mask" data-modal-close="addModal"></div>
+  <form class="modal-card" method="post" action="{{ url_for('main.add_item') }}"
+        enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <h3 id="addFormTitle">添加谷子</h3>
+    <input name="name" placeholder="谷子名称（必填）" maxlength="64" required>
+    <img id="addPreview" class="up-preview" alt="图片预览" hidden>
+    <label class="up-field">
+      <span>实物照片（可选，png / jpg / gif / webp，5MB 内）</span>
+      <input type="file" name="image" data-preview="addPreview"
+             accept="image/png,image/jpeg,image/gif,image/webp">
+    </label>
+    <input name="emoji" placeholder="Emoji，如 🐰（没照片时显示）" maxlength="8">
+    <label class="up-field">
+      <span>数量（总数）</span>
+      <input name="count" type="number" min="1" max="9999" value="1"
+             inputmode="numeric" placeholder="数量">
+    </label>
+    <label class="up-field">
+      <span>已出数量（部分出掉时填）</span>
+      <input name="sold_count" type="number" min="0" max="9999" value="0"
+             inputmode="numeric" placeholder="默认 0">
+    </label>
+    <select name="status">
+      <option value="displaying">展示中</option>
+      <option value="in_transit">在途</option>
+      <option value="sold">已出</option>
+      <option value="wishlist">心愿单</option>
+    </select>
+
+    {# 在途专属字段：状态选「在途」时才展开（值不会因为隐藏而丢） #}
+    <div class="status-fields" data-status-fields="in_transit">
+      <label class="up-field">
+        <span>预计到货日期</span>
+        <input type="date" name="expect_date">
+      </label>
+      <label class="up-field">
+        <span>购买渠道</span>
+        <select name="channel">
+          <option value="">未填写</option>
+          {% for key, label in channels.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="up-field">
+        <span>订单号 / 物流单号</span>
+        <input name="order_no" maxlength="64" autocomplete="off"
+               placeholder="选填，如 SF1234567890">
+      </label>
+    </div>
+
+    {# 已出专属字段：状态选「已出」时才展开 #}
+    <div class="status-fields" data-status-fields="sold">
+      <label class="up-field">
+        <span>成交价（元）</span>
+        <input name="sold_price" inputmode="decimal" autocomplete="off"
+               placeholder="选填，如 168.00">
+      </label>
+      <label class="up-field">
+        <span>出手方式</span>
+        <select name="sold_method">
+          <option value="">未填写</option>
+          {% for key, label in sold_methods.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="up-field">
+        <span>出手平台</span>
+        <select name="sold_channel">
+          <option value="">未填写</option>
+          {% for key, label in sale_channels.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="up-field">
+        <span>出手日期</span>
+        <input type="date" name="sold_at">
+      </label>
+    </div>
+
+    {# 心愿单专属字段：状态选「心愿单」时才展开 #}
+    <div class="status-fields" data-status-fields="wishlist">
+      <label class="up-field">
+        <span>想要程度</span>
+        <select name="want_level">
+          <option value="">未分级</option>
+          {% for key, label in want_levels.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="up-field">
+        <span>预算价（元）</span>
+        <input name="budget" inputmode="decimal" autocomplete="off"
+               placeholder="选填，如 300.00">
+      </label>
+      <label class="up-field">
+        <span>参考链接或店铺</span>
+        <input name="want_link" maxlength="255" autocomplete="off"
+               placeholder="选填，填链接或店铺名都行">
+      </label>
+      <label class="up-field">
+        <span>备注</span>
+        <input name="want_note" maxlength="120" autocomplete="off"
+               placeholder="选填，如「等再贩」「只收原画」">
+      </label>
+    </div>
+
+    {# 入手价：在途和已出都要用（已出时用来算盈亏），所以一直显示 #}
+    <label class="up-field">
+      <span>入手价（元，选填；已出时用来算盈亏）</span>
+      <input name="price" inputmode="decimal" autocomplete="off"
+             placeholder="选填，如 268.00">
+    </label>
+
+    <label class="up-field">
+      <span>周边品类（可选）</span>
+      <select name="category_type_id" data-cat-select="type">
+        <option value="">未分类</option>
+        {% for c in cats_type %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="up-field">
+      <span>作品IP（可选）</span>
+      <select name="category_ip_id" data-cat-select="ip">
+        <option value="">未分类</option>
+        {% for c in cats_ip %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="cat-hint">
+      没有想要的分类？<a class="cat-link" href="#" data-modal-open="catModal">分类管理</a>
+      里加一个，加完这里就能选。
+    </p>
+    <div class="modal-actions">
+      <button type="button" data-modal-close="addModal">取消</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+</div>

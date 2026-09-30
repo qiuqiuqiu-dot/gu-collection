@@ -1,0 +1,47 @@
+{# 谷子网格（仪表盘和 /items 谷柜页共用）
+   需要上下文里的：
+     groups —— [(分组名 or None, [items]), ...]
+               label 为 None 表示不分组（仪表盘预览就是这样）
+     group  —— 谷柜页当前的分组维度（type/ip），用于在卡片上补显示另一个维度 #}
+{% for label, group_items in groups %}
+{% if label %}
+<div class="sec-head group-head">
+  <h2>{{ label }}</h2>
+  <span class="more">{{ group_items|length }} 件</span>
+</div>
+{% endif %}
+<div class="grid">
+  {% for item in group_items %}
+  {# 详情/编辑要用的数据都挂在 data-* 上（片段与在途清单共用同一份） #}
+  <div class="g-card"
+       data-item-view role="button" tabindex="0"
+       aria-label="查看「{{ item.name }}」详情"
+       {% include "_item_data.html" %}>
+    <div class="g-thumb"
+         style="background:linear-gradient(145deg,{{ item.color_start }},{{ item.color_end }})">
+      {% if item.image %}
+      <img src="{{ url_for('static', filename='uploads/' ~ item.image) }}"
+           alt="{{ item.name }}" loading="lazy">
+      {% else %}
+      <span>{{ item.emoji }}</span>
+      {% endif %}
+      <i class="g-badge">{{ item.remaining }}</i>
+    </div>
+    <form class="g-del" method="post"
+          action="{{ url_for('main.delete_item', item_id=item.id) }}"
+          data-confirm="确定删除「{{ item.name }}」？">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" aria-label="删除 {{ item.name }}" title="删除">×</button>
+    </form>
+    <p>{{ item.name }}</p>
+    {# 只有真的在分组时才补显示另一个维度，预览（不分组）时保持干净 #}
+    {% if label %}
+    {% set other_cat = item.category_for('ip' if group == 'type' else 'type') %}
+    {% if other_cat %}<span class="g-sub">{{ other_cat.name }}</span>{% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="grid"><div class="empty">还没有谷子，点右下角 + 添加 →</div></div>
+{% endfor %}

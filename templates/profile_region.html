@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}选择地区 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>选择地区</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.profile_page') }}"
+         aria-label="返回个人信息" title="返回个人信息">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_region') }}" id="regionForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+
+          <label class="up-field">
+            <span>国家 / 地区</span>
+            <select name="country" id="selCountry">
+              {% for c in country_options %}
+              <option value="{{ c }}"
+                      {% if c == region.country %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+              <option value="{{ manual_value }}"
+                      {% if region.country == manual_value %}selected{% endif %}>
+                其他（手动填写）
+              </option>
+            </select>
+          </label>
+
+          <label class="up-field" id="wrapProvince"
+                 {% if region.country == manual_value %}hidden{% endif %}>
+            <span>省份 / 直辖市</span>
+            <select name="province" id="selProvince">
+              <option value="">请选择</option>
+              {% for p in province_options %}
+              <option value="{{ p }}" {% if p == region.province %}selected{% endif %}>
+                {{ p }}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="up-field" id="wrapCity"
+                 {% if region.country == manual_value %}hidden{% endif %}>
+            <span>城市</span>
+            <select name="city" id="selCity">
+              <option value="">请选择</option>
+              {% for c in city_options %}
+              <option value="{{ c }}" {% if c == region.city %}selected{% endif %}>
+                {{ c }}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="up-field" id="wrapArea"
+                 {% if region.country == manual_value %}hidden{% endif %}>
+            <span>区 / 县（可不选）</span>
+            <select name="area" id="selArea">
+              <option value="">不选</option>
+              {% for a in area_options %}
+              <option value="{{ a }}" {% if a == region.area %}selected{% endif %}>
+                {{ a }}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="up-field" id="wrapManual"
+                 {% if region.country != manual_value %}hidden{% endif %}>
+            <span>手动填写（如「上海 徐汇」）</span>
+            <input name="region_manual" id="regionManual" maxlength="64"
+                   value="{{ manual_text }}" autocomplete="off"
+                   placeholder="如：上海 徐汇">
+          </label>
+
+          <div class="wx-actions">
+            <button type="submit" class="set-btn primary" id="regionSaveBtn">保存地区</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="wx-group">
+      <div class="wx-form">
+        <form method="post" action="{{ url_for('main.profile_region') }}" id="locateForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="lat" id="locateLat">
+          <input type="hidden" name="lon" id="locateLon">
+          <div class="wx-actions">
+            <button type="submit" class="set-btn" id="locateBtn">📍 用当前位置</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="wx-note">
+      按「国家 → 省 → 市 → 区/县」一路选下来，区/县可以不选。
+      同城换谷按地区匹配同城的谷友，所以大家都从同一份数据里选，
+      不会出现「同一个地方两种写法」。
+    </p>
+    <p class="wx-note" id="locateHint">
+      「用当前位置」会向浏览器申请一次定位权限。这台机器上没有地图服务可以反查地名，
+      所以只能按坐标挑**最近的那个市**，是市级近似；区/县请自己再补一下。
+    </p>
+    <p class="wx-note" id="locateError" hidden></p>
+
+  </div>
+</div>
+
+<script>
+  // 四级联动：国家 → 省 → 市 → 区/县
+  // 数据从 static/regions.json 拉一次（浏览器会缓存），不在页面里重复内嵌。
+  (function () {
+    var MANUAL = '{{ manual_value }}';
+    var sel = {
+      country: document.getElementById('selCountry'),
+      province: document.getElementById('selProvince'),
+      city: document.getElementById('selCity'),
+      area: document.getElementById('selArea')
+    };
+    var wraps = {
+      province: document.getElementById('wrapProvince'),
+      city: document.getElementById('wrapCity'),
+      area: document.getElementById('wrapArea'),
+      manual: document.getElementById('wrapManual')
+    };
+    var tree = null;
+
+    function fill(select, names, placeholder, selected) {
+      select.innerHTML = '';
+      var first = document.createElement('option');
+      first.value = '';
+      first.textContent = placeholder;
+      select.appendChild(first);
+      names.forEach(function (name) {
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === selected) { opt.selected = true; }
+        select.appendChild(opt);
+      });
+    }
+
+    function provincesOf(country) {
+      return Object.keys((tree && tree[country]) || {});
+    }
+    function citiesOf(country, province) {
+      return Object.keys(((tree && tree[country]) || {})[province] || {});
+    }
+    function areasOf(country, province, city) {
+      return (((tree && tree[country]) || {})[province] || {})[city] || [];
+    }
+
+    // 选到哪一级就把下一级刷新出来；再往下的清空
+    function syncFrom(level, keep) {
+      var country = sel.country.value;
+      var isManual = country === MANUAL;
+      ['province', 'city', 'area'].forEach(function (k) {
+        wraps[k].hidden = isManual;
+      });
+      wraps.manual.hidden = !isManual;
+      if (isManual) { return; }
+
+      if (level === 'country') {
+        fill(sel.province, provincesOf(country), '请选择', keep || '');
+        fill(sel.city, [], '请选择', '');
+        fill(sel.area, [], '不选', '');
+      } else if (level === 'province') {
+        fill(sel.city, citiesOf(country, sel.province.value), '请选择', keep || '');
+        fill(sel.area, [], '不选', '');
+      } else if (level === 'city') {
+        fill(sel.area, areasOf(country, sel.province.value, sel.city.value), '不选',
+             keep || '');
+        // 有些市下面没有区（比如直辖市的部分层级），这时把区那一栏收起来
+        wraps.area.hidden = sel.area.options.length <= 1;
+      }
+    }
+
+    sel.country.addEventListener('change', function () { syncFrom('country'); });
+    sel.province.addEventListener('change', function () { syncFrom('province'); });
+    sel.city.addEventListener('change', function () { syncFrom('city'); });
+
+    fetch('{{ tree_url }}')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        tree = data;
+        // 服务端已经把当前值和选项渲染好了，这里只补上「换国家时也能用」的联动
+        if (sel.country.value !== MANUAL) {
+          syncFrom('province', sel.city.value);
+          syncFrom('city', sel.area.value);
+        }
+        sel.country.dataset.ready = '1';
+      })
+      .catch(function () {
+        var err = document.getElementById('locateError');
+        if (err) {
+          err.textContent = '地区数据没加载出来。可以直接选上面已有的省市，'
+            + '或选「其他（手动填写）」自己填。';
+          err.hidden = false;
+        }
+      });
+  })();
+
+  // 用当前位置：拿浏览器给的经纬度，交给服务端换算成最近的市
+  (function () {
+    var btn = document.getElementById('locateBtn');
+    var err = document.getElementById('locateError');
+    if (!btn) { return; }
+    function fail(text) {
+      if (err) { err.textContent = text; err.hidden = false; }
+      btn.disabled = false;
+      btn.textContent = '📍 用当前位置';
+    }
+    btn.addEventListener('click', function (e) {
+      if (!navigator.geolocation) {
+        e.preventDefault();
+        fail('这个浏览器不支持定位，请直接在上面选省市。');
+        return;
+      }
+      e.preventDefault();
+      btn.disabled = true;
+      btn.textContent = '定位中…';
+      if (err) { err.hidden = true; }
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        document.getElementById('locateLat').value = pos.coords.latitude;
+        document.getElementById('locateLon').value = pos.coords.longitude;
+        btn.form.submit();          // 坐标交给服务端换算，前端不用抄一份城市表
+      }, function (geoErr) {
+        fail(geoErr && geoErr.code === 1
+          ? '你拒绝了定位权限。不要紧，直接在上面选省市也一样。'
+          : '拿不到位置，请直接在上面选省市。');
+      }, { timeout: 10000, maximumAge: 600000 });
+    });
+  })();
+</script>
+{% endblock %}

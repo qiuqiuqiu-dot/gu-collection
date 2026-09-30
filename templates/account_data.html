@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}账号与数据 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>账号与数据</h1>
+        <p>{{ current_user.username }} ✿</p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    <section class="card set-card">
+      <h3>账号与安全</h3>
+      <p class="set-hint">密码、登录记录、把别的设备踢下线。和「我是谁」无关，所以单独一页。</p>
+      <div class="nav-list">
+        <a class="nav-row" href="{{ url_for('main.account_page') }}" id="toAccount">
+          <span class="nav-ico">🔒</span>
+          <span class="nav-text">
+            <b>进入账号与安全</b>
+            <i>修改密码 · 登录与设备</i>
+          </span>
+          <span class="nav-go">›</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="card set-card">
+      <h3>数据备份</h3>
+      <p class="set-hint">
+        导出这本账（含实物照片）、从备份恢复、看自动备份。
+        现在有 {{ backup_total }} 份自动备份，库里 {{ item_count }} 件谷子。
+      </p>
+      <div class="nav-list">
+        <a class="nav-row" href="{{ url_for('main.backup_page') }}" id="toBackup">
+          <span class="nav-ico">💾</span>
+          <span class="nav-text">
+            <b>进入数据备份</b>
+            <i>导出 / 导入 / 自动备份</i>
+          </span>
+          <span class="nav-go">›</span>
+        </a>
+      </div>
+    </section>
+
+    <p class="set-warn">
+      头像、用户名、地区不在这里 —— 那些在
+      <a class="cat-link" href="{{ url_for('main.profile_page') }}">个人信息</a>
+      里改。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}我的谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>我的谷仓</h1>
+        <p>
+          Hi, {{ current_user.username }} ✿
+          {% if current_user.signature %}<br><span class="greet-sign">{{ current_user.signature }}</span>{% endif %}
+        </p>
+      </div>
+      <div class="header-acts">
+        {# 头像本身就是「个人信息」入口：少一个图标，也一眼知道那是自己 #}
+        <a class="avatar-btn" href="{{ url_for('main.profile_page') }}"
+           aria-label="个人信息" title="个人信息">
+          {% if current_user.avatar %}
+          <img src="{{ url_for('static', filename='uploads/' ~ current_user.avatar) }}"
+               alt="{{ current_user.username }}">
+          {% else %}
+          <span>{{ (current_user.username or '谷')[0] | upper }}</span>
+          {% endif %}
+        </a>
+        <a class="icon-btn" href="{{ url_for('main.account_data_page') }}"
+           aria-label="账号与数据" title="账号与数据">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+          </svg>
+        </a>
+        <form class="logout-form" method="post" action="{{ url_for('main.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="icon-btn" type="submit" aria-label="退出登录" title="退出登录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <path d="M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </header>
+
+    <!-- 数据统计面板 -->
+    <section class="card stats">
+      <div class="stats-head">
+        <div class="stats-main">
+          <span class="num">{{ stats.total }}</span>
+          <span class="unit">件藏品</span>
+        </div>
+        <div class="trend">本月 +{{ stats.month_add }}</div>
+      </div>
+      {# 四个数字都能点：去对应专区页看这一类全部谷子 #}
+      <div class="stat-grid">
+        <a class="stat-item" id="statDisplaying" href="{{ url_for('main.all_items') }}"
+           title="看全部展示中的谷子">
+          <b>{{ stats.displaying }}</b><span>展示中</span>
+        </a>
+        <a class="stat-item" id="statInTransit" href="{{ url_for('main.transit') }}"
+           title="看全部在途的谷子">
+          <b>{{ stats.in_transit }}</b><span>在途</span>
+        </a>
+        <a class="stat-item" id="statSold" href="{{ url_for('main.sold') }}"
+           title="看全部已出的谷子">
+          <b>{{ stats.sold }}</b><span>已出</span>
+        </a>
+        <a class="stat-item" id="statWishlist" href="{{ url_for('main.wishlist') }}"
+           title="看全部心愿单">
+          <b>{{ stats.wishlist }}</b><span>心愿单</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- 谷柜：仪表盘只做「最新 6 件」预览，不分类；按分类浏览去谷柜页。
+         分类管理入口不放在这里了（首页用它的是右下角 + 号 → 分类管理）。 -->
+    <div class="sec-head">
+      <h2>谷柜</h2>
+      <a class="more" id="allItemsLink" href="{{ url_for('main.all_items') }}">
+        查看全部{% if total_items %} {{ total_items }} 件{% endif %} ›
+      </a>
+    </div>
+    {% include "_grid.html" %}
+
+    <!-- 在途：按预计到货追踪，可一键确认到货 -->
+    <div class="sec-head">
+      <h2>在途{% if stats.transit_overdue %} <em class="warn-chip">{{ stats.transit_overdue }} 件超期</em>{% endif %}</h2>
+      <a class="more" id="transitLink" href="{{ url_for('main.transit') }}">
+        {% if transit_total %}查看全部 {{ transit_total }} 件 ›{% else %}在途专区 ›{% endif %}
+      </a>
+    </div>
+    {% if transit %}
+    {% include "_transit_list.html" %}
+    {% else %}
+    <div class="empty">没有在途的谷子，添加时把状态选成「在途」就能追踪到货 →</div>
+    {% endif %}
+
+    <!-- 已出：回血记录，可一键撤回收藏 -->
+    <div class="sec-head">
+      <h2>已出{% if stats.sold_profit %} <em class="profit-chip {{ 'up' if stats.sold_profit > 0 else 'down' }}">{{ '+' if stats.sold_profit > 0 else '-' }}¥{{ '{:,.2f}'.format(stats.sold_profit|abs) }}</em>{% endif %}</h2>
+      <a class="more" id="soldLink" href="{{ url_for('main.sold') }}">
+        {% if sold_total %}查看全部 {{ sold_total }} 条 ›{% else %}已出专区 ›{% endif %}
+      </a>
+    </div>
+    {% if sold %}
+    {% include "_sold_list.html" %}
+    {% else %}
+    <div class="empty">没有已出的谷子，出掉之后把状态改成「已出」就能在这里记回血 →</div>
+    {% endif %}
+
+    <!-- 心愿单：想要但还没入手的，不占谷柜 -->
+    <div class="sec-head">
+      <h2>心愿单{% if stats.wishlist_budget %} <em class="want-chip">总预算 ¥{{ '{:,.2f}'.format(stats.wishlist_budget) }}</em>{% endif %}</h2>
+      <a class="more" id="wishlistLink" href="{{ url_for('main.wishlist') }}">
+        {% if wishlist_total %}查看全部 {{ wishlist_total }} 件 ›{% else %}心愿单专区 ›{% endif %}
+      </a>
+    </div>
+    {% if wishlist %}
+    {% include "_wishlist_list.html" %}
+    {% else %}
+    <div class="empty">心愿单是空的，把状态改成「心愿单」就能记想要的东西 →</div>
+    {% endif %}
+
+    <!-- 再贩提醒：可以增删改 -->
+    <div class="sec-head">
+      <h2>再贩提醒{% if reminder_past %} <em class="warn-chip">{{ reminder_past }} 条过期</em>{% endif %}</h2>
+      <a class="more" id="reminderLink" href="{{ url_for('main.reminders') }}">
+        {% if reminder_total %}查看全部 {{ reminder_total }} 条 ›{% else %}提醒专区 ›{% endif %}
+      </a>
+    </div>
+    {% if reminders %}
+    <div class="stack">
+      {% include "_reminder_list.html" %}
+    </div>
+    {% else %}
+    <div class="empty">还没有再贩提醒，记下哪天哪时再贩 →</div>
+    {% endif %}
+
+    {# 同城换谷：谷友互看的一块板。功能关掉时整块不渲染（见 routes.EXCHANGE_ENABLED） #}
+    {% if exchange_enabled %}
+    <div class="sec-head">
+      <h2>同城换谷{% if exchange_total %} <em class="want-chip">{{ exchange_total }} 条</em>{% endif %}</h2>
+      <a class="more" id="exchangeLink" href="{{ url_for('main.exchanges') }}">
+        {% if exchange_total %}查看全部 {{ exchange_total }} 条 ›{% else %}换谷板 ›{% endif %}
+      </a>
+    </div>
+    <div class="hscroll">
+      {% for ex in exchanges %}
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-emoji"
+               style="background:linear-gradient(145deg,{{ ex.color_start }},{{ ex.color_end }})">
+            {{ ex.emoji }}
+          </div>
+          <div class="ex-dist">
+            {% if ex.user_id == current_user.id %}我发的{% else %}📍 {{ ex.distance_text }}{% endif %}
+          </div>
+        </div>
+        <div class="ex-title">{{ ex.title }}</div>
+        <div class="ex-sub">
+          {% if ex.want %}可换 <em>{{ ex.want }}</em>{% endif %}
+          {% if ex.region %}{% if ex.want %} · {% endif %}{{ ex.region }}{% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="empty">还没有换谷信息，点右下角 + 发布一条</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+  {# 统一 + 号：谷柜 / 在途 / 心愿单 / 提醒 / 换谷都在这一处入口里选 #}
+  {% include "_add_sheet.html" %}
+  {% include "_viewer.html" %}
+
+</div>
+{% endblock %}

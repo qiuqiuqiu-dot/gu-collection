@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}已出 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>已出</h1>
+        <p>
+          {% if total_items %}
+          累计出掉 {{ stats.sold_qty }} 件{% if stats.sold_income %} · 回血 ¥{{ '{:,.2f}'.format(stats.sold_income) }}{% endif %}{% if stats.sold_profit %} · <b class="{{ 'profit-up' if stats.sold_profit > 0 else 'profit-down' }}">{{ '+' if stats.sold_profit > 0 else '-' }}¥{{ '{:,.2f}'.format(stats.sold_profit|abs) }}</b>{% endif %}
+          {% else %}
+          还没有出掉的谷子
+          {% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {% if sold %}
+    <p class="transit-hint">
+      共 {{ total_items }} 条出货记录，按出手日期从近到远排。
+      「撤回」表示这次出货作废，会把出掉的件数清零。
+    </p>
+    {% include "_sold_list.html" %}
+    {% else %}
+    <div class="empty">
+      还没有出掉的谷子。<br>
+      出掉一件时把「已出数量」填上，或者把状态选成「已出」，记录就会出现在这里。
+      <button type="button" class="link-btn" data-add-kind="sold">
+        ＋ 记一件已出掉的谷子
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+  {% include "_viewer.html" %}
+
+</div>
+{% endblock %}

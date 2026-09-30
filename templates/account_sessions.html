@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}登录与设备 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>登录与设备</h1>
+        <p>{{ current_user.username }} ✿</p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.account_page') }}"
+         aria-label="返回账号与安全" title="返回账号与安全">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <section class="card set-card">
+      <h3>我的登录</h3>
+      <div class="kv-list">
+        <div class="kv"><span>账号</span><b>{{ current_user.username }}</b></div>
+        <div class="kv"><span>注册时间</span><b>{{ current_user.created_text or '—' }}</b></div>
+        <div class="kv"><span>上次登录</span>
+          <b id="kvLastLogin">{{ current_user.last_login_text }}</b></div>
+      </div>
+    </section>
+
+    <section class="card set-card">
+      <h3>退出其它设备</h3>
+      <p class="set-hint">
+        如果你在别人电脑或旧手机上登录过，点这个把它们踢下线。
+        <b>当前这台不受影响</b>，不用重新登录。
+      </p>
+      <form method="post" action="{{ url_for('main.account_sessions') }}"
+            data-confirm="退出其它设备上的登录？这台不受影响。">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="set-btn" id="logoutAllBtn">退出其它设备</button>
+      </form>
+    </section>
+
+    <section class="card set-card">
+      <h3>登录保护</h3>
+      <ul class="plain-list">
+        <li>同一个用户名连续输错 {{ max_fails }} 次密码，会被锁 {{ lock_minutes }} 分钟，
+          期间连正确密码也进不去 —— 防的是有人在你电脑上一直试。</li>
+        <li>登录成功会记下时间，就是上面看到的「上次登录」。</li>
+        <li>登录失败不会提示「用户名不存在」，避免被人试出有哪些账号。</li>
+        <li>限流是按「用户名 + 来源 IP」算的，重启程序会清零。</li>
+      </ul>
+    </section>
+
+    <p class="set-warn">
+      这里看到的只是「这台机器」的记录：这个程序是单机自用的，
+      没有云端账号体系，所以也没法列出你所有设备的清单。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{# 在途清单（仪表盘板块和 /transit 页共用）
+   需要上下文里的 transit —— 已在途且按预计到货排好序。
+   每行都能点开详情；「确认到货」是普通 POST，不需要 JS。 #}
+{% for item in transit %}
+<div class="side-item{% if item.overdue %} is-overdue{% endif %}"
+     data-item-view role="button" tabindex="0"
+     aria-label="查看「{{ item.name }}」详情"
+     {% include "_item_data.html" %}>
+  <div class="s-thumb"
+       style="background:linear-gradient(145deg,{{ item.color_start }},{{ item.color_end }})">
+    {% if item.image %}
+    <img src="{{ url_for('static', filename='uploads/' ~ item.image) }}"
+         alt="{{ item.name }}" loading="lazy">
+    {% else %}
+    <span>{{ item.emoji }}</span>
+    {% endif %}
+  </div>
+
+  <div class="s-body">
+    <p class="s-name">{{ item.name }}</p>
+    {% if item.source_text %}<span class="s-src">{{ item.source_text }}</span>{% endif %}
+    {% if item.transit_meta_text %}
+    <span class="s-meta">{{ item.transit_meta_text }}</span>
+    {% endif %}
+  </div>
+
+  <div class="s-right">
+    <span class="s-pill{% if item.overdue %} overdue{% endif %}">{{ item.countdown_text }}</span>
+    <form method="post" action="{{ url_for('main.arrive_item', item_id=item.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button type="submit" class="s-act">确认到货</button>
+    </form>
+  </div>
+</div>
+{% endfor %}

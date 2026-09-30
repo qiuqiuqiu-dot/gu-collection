@@ -1,0 +1,55 @@
+{# 换谷信息的添加/编辑弹窗（共用一个表单，由 JS 切换标题和 action） #}
+<div class="modal" id="exchangeModal">
+  <div class="modal-mask" data-modal-close="exchangeModal"></div>
+  <form class="modal-card" id="exchangeForm" method="post"
+        action="{{ url_for('main.add_exchange') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <h3 id="exchangeFormTitle">发布换谷信息</h3>
+
+    <label class="up-field">
+      <span>求换什么（必填）</span>
+      <input name="title" id="exTitle" maxlength="80" required
+             placeholder="如：求换 星野吧唧">
+    </label>
+    <label class="up-field">
+      <span>能换什么</span>
+      <input name="want" id="exWant" maxlength="80"
+             placeholder="选填，如：白兔立牌">
+    </label>
+    <label class="up-field">
+      <span>Emoji</span>
+      <input name="emoji" id="exEmoji" maxlength="8" placeholder="如 🐰">
+    </label>
+    <label class="up-field">
+      <span>大概多远（km）</span>
+      <input name="distance_km" id="exDistance" inputmode="decimal"
+             placeholder="选填，默认 1">
+    </label>
+    <label class="up-field">
+      <span>面交地点</span>
+      <input name="place" id="exPlace" maxlength="60"
+             placeholder="选填，如：地铁 2 号线 xx 站内">
+    </label>
+    <label class="up-field">
+      <span>联系方式</span>
+      <input name="contact" id="exContact" maxlength="60"
+             placeholder="选填，如：微信 xxxx">
+    </label>
+    <label class="up-field">
+      <span>补充说明</span>
+      <input name="note" id="exNote" maxlength="120"
+             placeholder="选填，如：只换原画，可验货">
+    </label>
+
+    <p class="cat-hint" style="margin-top:2px">
+      会带上你当前的地区{% if current_user.region %}「{{ current_user.region }}」{% endif %}，
+      方便同城谷友找到你。
+    </p>
+
+    <div class="modal-actions">
+      <button type="button" data-modal-close="exchangeModal">取消</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+</div>

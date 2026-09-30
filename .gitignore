@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+.tmp/
+instance/
+*.db
+# 用户上传的图片不入库到 git
+static/uploads/
+.env
+# 测试产物：渲染出的页面、测试库、测试上传都写在这里
+tests/.build/
+# jsdom 依赖（需要时在 tests/ 下 npm install）
+node_modules/
+# IDE 的项目文件（编辑器状态、路径缓存，不该进仓库）
+.idea/
+.vscode/

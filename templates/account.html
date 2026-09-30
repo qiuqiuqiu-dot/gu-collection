@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}账号与安全 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>账号与安全</h1>
+        <p>只放和登录有关的事</p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.account_data_page') }}"
+         aria-label="返回账号与数据" title="返回账号与数据">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <section class="card set-card">
+      <h3>登录</h3>
+      <div class="nav-list">
+        <a class="nav-row" href="{{ url_for('main.account_password') }}" id="toPassword">
+          <span class="nav-ico">🔑</span>
+          <span class="nav-text">
+            <b>修改密码</b>
+            <i>要填当前密码；改完其它设备会退出登录</i>
+          </span>
+          <span class="nav-go">›</span>
+        </a>
+        <a class="nav-row" href="{{ url_for('main.account_sessions') }}" id="toSessions">
+          <span class="nav-ico">📱</span>
+          <span class="nav-text">
+            <b>登录与设备</b>
+            <i>上次登录时间、退出其它设备</i>
+          </span>
+          <span class="nav-go">›</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="card set-card">
+      <h3>这个程序怎么保护你的账号</h3>
+      <ul class="plain-list">
+        <li>密码只存散列值（加盐哈希），数据库里没有明文，也没人能反推出来。</li>
+        <li>同一个用户名连续输错 {{ max_fails }} 次密码，就锁 {{ lock_minutes }} 分钟不能登录。</li>
+        <li>改密码或点「退出其它设备」会让别处的登录立刻失效，这台不受影响。</li>
+        <li>所有会改动数据的表单都带 CSRF 校验，别的网站没法替你提交。</li>
+        <li>登录失败不会提示「用户名不存在」，避免被人拿来试出有哪些账号。</li>
+      </ul>
+    </section>
+
+    <p class="set-warn">
+      没有邮箱找回：忘了密码谁也救不回来（只有数据库文件和备份）。
+      用户名和头像在「个人信息」里改。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

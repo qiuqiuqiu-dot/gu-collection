@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}再贩提醒 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>再贩提醒</h1>
+        <p>
+          {% if total_items %}
+          {{ total_items }} 条{% if reminder_past %} · <b class="warn-text">{{ reminder_past }} 条已过期</b>{% endif %}
+          {% else %}
+          还没有提醒
+          {% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {% if reminders %}
+    <p class="transit-hint">
+      按时间从近到远排，已经过期的排在最后。抢完了点「知道了」删掉这条提醒。
+    </p>
+    {% include "_reminder_list.html" %}
+    {% else %}
+    <div class="empty">
+      还没有再贩提醒。<br>
+      记下哪天哪时再贩，到点前来抢。
+      <button type="button" class="link-btn"
+              data-modal-open="reminderModal" data-reminder-mode="add">
+        ＋ 记一个再贩提醒
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+
+</div>
+{% endblock %}

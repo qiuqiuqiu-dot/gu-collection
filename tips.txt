@@ -1,0 +1,9 @@
+D:/anaconda/Scripts/activate     
+
+conda activate defect
+
+cd "C:\Users\不去明知山\Desktop\文件夹\GU_App"
+
+.\.venv\Scripts\python.exe init_db.py
+
+.\.venv\Scripts\python.exe app.py

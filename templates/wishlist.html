@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}心愿单 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>心愿单</h1>
+        <p>
+          {% if total_items %}
+          {{ total_items }} 件想要{% if stats.wishlist_budget %} · 总预算 ¥{{ '{:,.2f}'.format(stats.wishlist_budget) }}{% endif %}
+          {% else %}
+          还没有想要的东西
+          {% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {% if wishlist %}
+    <p class="transit-hint">
+      按想要程度排（很想要 → 一般 → 随缘），同级别里预算低的在前。
+      心愿单不占谷柜，点「已入手」就正式进柜。
+    </p>
+    {% include "_wishlist_list.html" %}
+    {% else %}
+    <div class="empty">
+      心愿单还是空的。<br>
+      想要什么先记在这里，不占谷柜；到手了点「已入手」就正式进柜。
+      <button type="button" class="link-btn" data-add-kind="wishlist">
+        ＋ 记一件想要的
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+  {% include "_viewer.html" %}
+
+</div>
+{% endblock %}

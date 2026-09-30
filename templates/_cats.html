@@ -1,0 +1,50 @@
+{# 分类管理弹窗：两个维度都在这里增删。
+   有 JS 时走 fetch（弹窗不关、不重载，可以连着加好几个）；
+   没 JS 时退化成普通 POST + 整页回跳（靠 next 回到原处）。 #}
+<div class="modal" id="catModal">
+  <div class="modal-mask" data-modal-close="catModal"></div>
+  <div class="modal-card cat-card" role="dialog" aria-modal="true"
+       aria-labelledby="catTitle">
+    <h3 id="catTitle">分类管理</h3>
+    <p class="cat-hint">两套分类随时切换；同一件谷子可以同时属于一个品类和一个作品IP。</p>
+
+    {# 操作结果就地提示，不用重载页面 #}
+    <div class="cat-msg" id="catMsg" role="status" hidden></div>
+
+    {% for kind, label, cats in [('type', '周边品类', cats_type),
+                                 ('ip', '作品IP', cats_ip)] %}
+    <section class="cat-block" data-kind="{{ kind }}">
+      <div class="cat-block-head">
+        <h4>{{ label }}</h4>
+        <span>{{ cats|length }} 个</span>
+      </div>
+      <div class="cat-chips">
+        {% for c in cats %}
+        <form class="cat-del" method="post"
+              action="{{ url_for('main.delete_category', cat_id=c.id) }}"
+              data-confirm="删除「{{ c.name }}」？用到它的谷子会变成未分类">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button type="submit" class="cat-chip"
+                  title="删除「{{ c.name }}」">{{ c.name }} <i>×</i></button>
+        </form>
+        {% else %}
+        <span class="cat-empty">还没有，在下面加一个</span>
+        {% endfor %}
+      </div>
+      <form class="cat-add" method="post" action="{{ url_for('main.add_category') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="kind" value="{{ kind }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <input name="name" maxlength="32" required autocomplete="off"
+               placeholder="新增{{ label }}，如 {{ '吧唧' if kind == 'type' else '某某' }}">
+        <button type="submit">添加</button>
+      </form>
+    </section>
+    {% endfor %}
+
+    <div class="modal-actions">
+      <button type="button" data-modal-close="catModal">关 闭</button>
+    </div>
+  </div>
+</div>

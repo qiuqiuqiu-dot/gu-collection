@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}同城换谷 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>同城换谷</h1>
+        <p>
+          {% if total_items %}
+          {{ total_items }} 条信息{% if same_region %} · <b>{{ same_region }} 条同城</b>{% endif %}
+          {% else %}
+          还没有换谷信息
+          {% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    <!-- 我的地区：用来匹配同城 -->
+    <form class="region-bar" method="post" action="{{ url_for('main.profile_region') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <span class="region-label">我的地区</span>
+      <input name="region" maxlength="32" value="{{ current_user.region or '' }}"
+             placeholder="如：上海 徐汇" autocomplete="off">
+      <button type="submit">保存</button>
+    </form>
+
+    {% if exchanges %}
+    <p class="transit-hint">
+      我发的最上面，然后是同地区谷友的，再按距离从近到远。
+      「撤下」只对自己发的有效。
+    </p>
+    {% include "_exchange_list.html" %}
+    {% else %}
+    <div class="empty">
+      还没有换谷信息。<br>
+      发布一条「求换什么、能换什么、在哪面交」，同城谷友就能看到。
+      <button type="button" class="link-btn"
+              data-modal-open="exchangeModal" data-exchange-mode="add">
+        ＋ 发布一条换谷信息
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}数据备份 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>数据备份</h1>
+        <p>
+          当前 {{ item_count }} 件谷子{% if photo_count %} · {{ photo_count }} 张照片{% endif %}
+        </p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.account_data_page') }}"
+         aria-label="返回账号与数据" title="返回账号与数据">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回</span>
+      </a>
+    </header>
+
+    <!-- 导出 -->
+    <section class="card set-card">
+      <h3>① 导出全部数据</h3>
+      <p class="set-hint">
+        把你这本账（谷子、分类、提醒、换谷信息）和实物照片打成一个 zip 下载。
+        存到网盘或者另一块硬盘上，就是一份完整的副本。
+      </p>
+      <a class="set-btn primary" id="exportBtn" href="{{ url_for('main.export_data') }}">
+        ⬇ 导出备份文件（.zip）
+      </a>
+    </section>
+
+    <!-- 导入 -->
+    <section class="card set-card">
+      <h3>② 从备份文件恢复</h3>
+      <p class="set-hint">
+        <b>只追加，不覆盖</b>：现有谷子一件都不会被删掉或改掉，
+        备份里的内容会作为新条目加进来（分类按名字对齐，已有的直接复用）。
+        所以同一份备份导入两次，就会有重样的两份。
+      </p>
+      <form method="post" action="{{ url_for('main.import_data') }}"
+            enctype="multipart/form-data" data-confirm="把备份包里的内容追加到当前账号？">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <label class="up-field">
+          <span>选择导出时下载的 .zip 文件</span>
+          <input type="file" name="file" id="importFile"
+                 accept="application/zip,.zip" required>
+        </label>
+        <button type="submit" class="set-btn" id="importBtn">⬆ 导入这个备份包</button>
+      </form>
+    </section>
+
+    <!-- 自动备份 -->
+    <section class="card set-card">
+      <h3>③ 自动备份</h3>
+      <p class="set-hint">
+        程序每次启动会备份一次数据库，之后每天第一次打开也备份一次，
+        存在 <code>instance/backups/</code>，只保留最近 {{ keep_backups }} 份。
+        数据库只有几十 KB，多留几份不占地方。
+      </p>
+      <form method="post" action="{{ url_for('main.backup_now') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button type="submit" class="set-btn" id="backupNowBtn">⟳ 立刻备份一份</button>
+      </form>
+
+      {% if backups %}
+      <div class="set-list">
+        {% for b in backups %}
+        <div class="set-row">
+          <div class="set-row-main">
+            <b>{{ b.name }}</b>
+            <span>{{ (b.size / 1024) | round(1) }} KB · {{ b.time_text }}</span>
+          </div>
+          {% if can_download %}
+          <a class="set-dl" href="{{ url_for('main.download_backup', name=b.name) }}"
+             title="下载这份备份">下载</a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% if not can_download %}
+      <p class="set-hint">
+        整库备份包含所有账号的数据，所以只有主账号能下载。
+        你自己的数据用上面的「导出」就能完整拿到。
+      </p>
+      {% endif %}
+      {% else %}
+      <p class="set-hint">还没有备份文件。</p>
+      {% endif %}
+    </section>
+
+    <p class="set-warn">
+      提醒：自动备份和导出文件都在这台电脑上。真正稳的做法是定期把导出的 zip
+      存到别的地方（网盘 / U 盘 / 另一台机器）。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

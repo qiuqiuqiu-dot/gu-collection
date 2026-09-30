@@ -1,0 +1,43 @@
+{# 心愿单清单（仪表盘板块和 /wishlist 页共用）
+   需要上下文里的 wishlist —— 已按想要程度 + 预算排好序。
+   每行可点开详情；「已入手」是普通 POST，点了就进谷柜。 #}
+{% for item in wishlist %}
+<div class="side-item is-want-{{ item.want_level_state }}"
+     data-item-view role="button" tabindex="0"
+     aria-label="查看「{{ item.name }}」详情"
+     {% include "_item_data.html" %}>
+  <div class="s-thumb"
+       style="background:linear-gradient(145deg,{{ item.color_start }},{{ item.color_end }})">
+    {% if item.image %}
+    <img src="{{ url_for('static', filename='uploads/' ~ item.image) }}"
+         alt="{{ item.name }}" loading="lazy">
+    {% else %}
+    <span>{{ item.emoji }}</span>
+    {% endif %}
+  </div>
+
+  <div class="s-body">
+    <p class="s-name">{{ item.name }}</p>
+    {% if item.want_source_text %}<span class="s-src">{{ item.want_source_text }}</span>{% endif %}
+    {% if item.want_link %}
+    <span class="s-meta">
+      {% if item.want_link_href %}
+      <a class="s-link" href="{{ item.want_link_href }}" target="_blank"
+         rel="noopener noreferrer">{{ item.want_link }}</a>
+      {% else %}{{ item.want_link }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="s-right">
+    <span class="s-pill want-{{ item.want_level_state }}">
+      {{ item.want_level_text or "未分级" }}
+    </span>
+    <form method="post" action="{{ url_for('main.acquire_item', item_id=item.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button type="submit" class="s-act">已入手</button>
+    </form>
+  </div>
+</div>
+{% endfor %}

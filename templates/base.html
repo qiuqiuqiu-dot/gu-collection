@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#F1F8F4">
+  <title>{% block title %}谷仓{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {# flash 提示统一在这里渲染，所有页面都能看到 #}
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}
+    <div class="flash-stack">
+      {% for cat, m in msgs %}
+        <div class="flash {{ cat }}">{{ m }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block body %}{% endblock %}
+
+  <script>
+    // flash 提示：点击立即关闭，4 秒后自动消失
+    document.querySelectorAll('.flash').forEach(function (el) {
+      var dismissed = false;
+      function dismiss() {
+        if (dismissed) { return; }
+        dismissed = true;
+        el.classList.add('hide');
+        setTimeout(function () { el.remove(); }, 300);
+      }
+      el.addEventListener('click', dismiss);
+      setTimeout(dismiss, 4000);
+    });
+
+    // 弹窗开关：data-modal-open / data-modal-close
+    function toggleModal(id, show) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.toggle('show', show); }
+    }
+    document.querySelectorAll('[data-modal-open]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();   // href="#" 的触发链接不要跳锚点
+        toggleModal(el.dataset.modalOpen, true);
+      });
+    });
+    document.querySelectorAll('[data-modal-close]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        toggleModal(el.dataset.modalClose, false);
+      });
+    });
+
+    // 危险操作二次确认：data-confirm="提示语"
+    // 用捕获阶段的委托：动态插进来的表单（比如刚加的分类）也自动有确认框
+    document.addEventListener('submit', function (e) {
+      var form = e.target.closest && e.target.closest('form[data-confirm]');
+      if (form && !window.confirm(form.dataset.confirm)) { e.preventDefault(); }
+    }, true);
+
+    // 选图后本地预览：input[data-preview="目标元素id"]
+    document.querySelectorAll('input[type="file"][data-preview]').forEach(function (input) {
+      input.addEventListener('change', function () {
+        var box = document.getElementById(input.dataset.preview);
+        if (!box) { return; }
+        if (box.dataset.objectUrl) {
+          URL.revokeObjectURL(box.dataset.objectUrl);  // 释放上一个，避免内存泄漏
+          delete box.dataset.objectUrl;
+        }
+        var file = input.files && input.files[0];
+        if (!file) {
+          box.hidden = true;
+          box.removeAttribute('src');
+          return;
+        }
+        var url = URL.createObjectURL(file);
+        box.dataset.objectUrl = url;
+        box.src = url;
+        box.hidden = false;
+      });
+    });
+
+    // 状态专属字段（在途的到货/渠道、已出的成交价/出手信息）只在需要时展开。
+    // 同时把「总数 / 已出件数 / 状态」三者对齐，规则和服务端 _normalize_quantity 一致：
+    //   · 选「已出」= 整件出完 → 已出件数自动填成总数
+    //   · 把已出件数改小（还有剩的）→ 状态自动回到「展示中」，剩下的继续在谷柜展出
+    //   · 已出件数填到 = 总数 → 状态自动变「已出」
+    // 注意：隐藏不等于禁用，值照样提交，所以之前填过的不会因为收起而丢。
+    var syncStatusFields = function (form, source) {
+      if (!form) { return; }
+      var sel = form.querySelector('select[name="status"]');
+      if (!sel) { return; }
+      var countInput = form.querySelector('input[name="count"]');
+      var soldInput = form.querySelector('input[name="sold_count"]');
+      var total = countInput ? Math.max(parseInt(countInput.value, 10) || 1, 1) : 1;
+      var soldQty = soldInput ? Math.max(parseInt(soldInput.value, 10) || 0, 0) : 0;
+
+      if (soldInput) {
+        if (source === 'status' && sel.value === 'sold' && soldQty < total) {
+          soldInput.value = total;            // 选了「已出」就是整件出完
+          soldQty = total;
+        } else if (source === 'sold_count' || source === 'count') {
+          // 件数是准绳：填满就是已出，还有剩的就不是已出（改总数时同样要重算）
+          if (soldQty >= total) {
+            sel.value = 'sold';
+          } else if (sel.value === 'sold') {
+            sel.value = 'displaying';
+          }
+        }
+      }
+
+      form.querySelectorAll('[data-status-fields]').forEach(function (wrap) {
+        if (wrap.dataset.statusFields === 'sold') {
+          // 出货信息：状态是已出，或者已经出了几件（部分已出）时都展开
+          wrap.hidden = !(sel.value === 'sold' || soldQty > 0);
+        } else {
+          wrap.hidden = (wrap.dataset.statusFields !== sel.value);
+        }
+      });
+    };
+    document.querySelectorAll('form').forEach(function (form) {
+      if (!form.querySelector('[data-status-fields]')) { return; }
+      var sel = form.querySelector('select[name="status"]');
+      if (!sel) { return; }
+      sel.addEventListener('change', function () {
+        syncStatusFields(form, 'status');
+      });
+      var soldInput = form.querySelector('input[name="sold_count"]');
+      if (soldInput) {
+        soldInput.addEventListener('input', function () {
+          syncStatusFields(form, 'sold_count');
+        });
+      }
+      var countInput = form.querySelector('input[name="count"]');
+      if (countInput) {
+        countInput.addEventListener('input', function () {
+          syncStatusFields(form, 'count');
+        });
+      }
+      syncStatusFields(form, 'init');
+    });
+
+    // 点谷子卡片：看大图 + 详情（数据从卡片的 data-* 里读）
+    var viewModal = document.getElementById('viewModal');
+    if (viewModal) {
+      var vRead = document.getElementById('viewerRead');
+      var vImg = document.getElementById('viewerImg');
+      var vEmoji = document.getElementById('viewerEmoji');
+      var vLink = document.getElementById('viewerLink');
+      var vName = document.getElementById('viewerName');
+      var vStatus = document.getElementById('viewerStatus');
+      var vCount = document.getElementById('viewerCount');
+      var vTime = document.getElementById('viewerTime');
+      var vCatTypeText = document.getElementById('viewerCatType');
+      var vCatIPText = document.getElementById('viewerCatIP');
+      var vShot = viewModal.querySelector('.viewer-shot');
+
+      var vEditForm = document.getElementById('editForm');
+      var vEditBtn = document.getElementById('viewerEditBtn');
+      var vEditCancel = document.getElementById('editCancel');
+      var vEditPreview = document.getElementById('editPreview');
+      var vRemoveWrap = document.getElementById('editRemoveWrap');
+      var vRemoveBox = vRemoveWrap && vRemoveWrap.querySelector('input');
+      var vFileInput = vEditForm && vEditForm.querySelector('input[type="file"]');
+      var vCatType = document.getElementById('editCatType');
+      var vCatIP = document.getElementById('editCatIP');
+      var vExpect = document.getElementById('editExpect');
+      var vChannel = document.getElementById('editChannel');
+      var vOrderNo = document.getElementById('editOrderNo');
+      var vPrice = document.getElementById('editPrice');
+      var vSoldPrice = document.getElementById('editSoldPrice');
+      var vSoldMethod = document.getElementById('editSoldMethod');
+      var vSoldChannel = document.getElementById('editSoldChannel');
+      var vSoldAt = document.getElementById('editSoldAt');
+      var vWantLevel = document.getElementById('editWantLevel');
+      var vBudget = document.getElementById('editBudget');
+      var vWantLink = document.getElementById('editWantLink');
+      var vWantNote = document.getElementById('editWantNote');
+      var currentCard = null;
+
+      // 一行「标签 + 值」：有值就显示，没值就整行收起来
+      var setInfoRow = function (rowId, valueId, text) {
+        var row = document.getElementById(rowId);
+        var cell = document.getElementById(valueId);
+        if (cell) { cell.textContent = text || '—'; }
+        if (row) { row.hidden = !text; }
+      };
+
+      var clearEditPreview = function () {
+        if (!vEditPreview) { return; }
+        if (vEditPreview.dataset.objectUrl) {
+          URL.revokeObjectURL(vEditPreview.dataset.objectUrl);
+          delete vEditPreview.dataset.objectUrl;
+        }
+        vEditPreview.hidden = true;
+        vEditPreview.removeAttribute('src');
+      };
+
+      var showRead = function () {
+        vRead.hidden = false;
+        vEditForm.hidden = true;
+        clearEditPreview();
+      };
+
+      var openViewer = function (card) {
+        var d = card.dataset;
+        currentCard = card;
+        vName.textContent = d.name || '未命名';
+        vStatus.textContent = d.status || '未分类';
+        vCount.textContent = '×' + (d.remaining || '1');
+        vTime.textContent = d.time || '—';
+        // 分类名直接来自卡片的 data-*（服务端取的，不会再查一次库）
+        if (vCatTypeText) { vCatTypeText.textContent = d.catTypeName || '未分类'; }
+        if (vCatIPText) { vCatIPText.textContent = d.catIpName || '未分类'; }
+        // 在途/购买信息：有值才显示这一行
+        setInfoRow('rowCount', 'viewerCountText', d.partial === '1' ? d.countText : '');
+        setInfoRow('rowPrice', 'viewerPrice', d.priceText);
+        setInfoRow('rowChannel', 'viewerChannel', d.channelText);
+        setInfoRow('rowOrderNo', 'viewerOrderNo', d.orderNo);
+        setInfoRow('rowExpect', 'viewerExpect', d.expectText);
+        setInfoRow('rowArrived', 'viewerArrived', d.arrivedText);
+        setInfoRow('rowSoldPrice', 'viewerSoldPrice', d.soldPriceText);
+        setInfoRow('rowProfit', 'viewerProfit', d.profitText);
+        setInfoRow('rowSoldSource', 'viewerSoldSource', d.soldSourceText);
+        setInfoRow('rowSoldAt', 'viewerSoldAt', d.soldAtText);
+        // 心愿：程度 + 预算合成一行；参考和备注各一行
+        var wantParts = [];
+        if (d.wantLevelText) { wantParts.push(d.wantLevelText); }
+        if (d.budgetText) { wantParts.push('预算 ' + d.budgetText); }
+        setInfoRow('rowWant', 'viewerWant', wantParts.join(' · '));
+        setInfoRow('rowWantLink', 'viewerWantLink', d.wantLink);
+        setInfoRow('rowWantNote', 'viewerWantNote', d.wantNote);
+        var vProfitRow = document.getElementById('rowProfit');
+        if (vProfitRow) {
+          vProfitRow.classList.toggle('up', d.profitState === 'up');
+          vProfitRow.classList.toggle('down', d.profitState === 'down');
+        }
+        var vExpectRow = document.getElementById('rowExpect');
+        if (vExpectRow) {
+          vExpectRow.classList.toggle('overdue', d.expectOverdue === '1');
+        }
+        vEmoji.textContent = d.emoji || '🎁';
+        vShot.style.background = 'linear-gradient(145deg,' +
+          (d.colorStart || '#EAF3FF') + ',' + (d.colorEnd || '#D9E9FF') + ')';
+        if (d.image) {
+          vImg.src = d.image;
+          vImg.alt = d.name || '';
+          vImg.hidden = false;
+          vEmoji.hidden = true;
+          vLink.href = d.image;              // 点大图可在新标签页看原图
+        } else {
+          vImg.removeAttribute('src');
+          vImg.hidden = true;
+          vEmoji.hidden = false;
+          vLink.removeAttribute('href');     // 没图就不做成链接
+        }
+        showRead();
+        toggleModal('viewModal', true);
+      };
+
+      var showEdit = function (card) {
+        var d = card.dataset;
+        // 提交地址由服务端用 url_for 生成，前端只负责套用，不拼路由字符串
+        vEditForm.action = d.editUrl;
+        document.getElementById('editName').value = d.name || '';
+        document.getElementById('editEmoji').value = d.emoji || '';
+        document.getElementById('editCount').value = d.count || '1';
+        var vSoldCount = document.getElementById('editSoldCount');
+        if (vSoldCount) { vSoldCount.value = d.soldCount || '0'; }
+        document.getElementById('editStatus').value = d.statusValue || 'displaying';
+        // 分类下拉：选项是服务端渲染的，这里只把当前值选上（空串 = 未分类）
+        if (vCatType) { vCatType.value = d.catType || ''; }
+        if (vCatIP) { vCatIP.value = d.catIp || ''; }
+        // 在途/已出字段：先把原值填进去（即使随后被收起，提交时也不会丢）
+        if (vExpect) { vExpect.value = d.expectDate || ''; }
+        if (vChannel) { vChannel.value = d.channel || ''; }
+        if (vOrderNo) { vOrderNo.value = d.orderNo || ''; }
+        if (vPrice) { vPrice.value = d.price || ''; }
+        if (vSoldPrice) { vSoldPrice.value = d.soldPrice || ''; }
+        if (vSoldMethod) { vSoldMethod.value = d.soldMethod || ''; }
+        if (vSoldChannel) { vSoldChannel.value = d.soldChannel || ''; }
+        if (vSoldAt) { vSoldAt.value = d.soldAt || ''; }
+        if (vWantLevel) { vWantLevel.value = d.wantLevel || ''; }
+        // 预算传的是格式化后的「¥1,234.00」，去掉币号和千分位才是 input 认的数字
+        if (vBudget) { vBudget.value = d.budgetText ? d.budgetText.replace(/[¥,]/g, '') : ''; }
+        if (vWantLink) { vWantLink.value = d.wantLink || ''; }
+        if (vWantNote) { vWantNote.value = d.wantNote || ''; }
+        syncStatusFields(vEditForm);
+        vRemoveWrap.hidden = !d.image;        // 没照片就不给「删除照片」
+        if (vRemoveBox) { vRemoveBox.checked = false; }
+        if (vFileInput) { vFileInput.value = ''; }   // 清掉上次选过的文件
+        clearEditPreview();
+        vRead.hidden = true;
+        vEditForm.hidden = false;
+      };
+
+      if (vEditBtn) {
+        vEditBtn.addEventListener('click', function () {
+          if (currentCard) { showEdit(currentCard); }
+        });
+      }
+      if (vEditCancel) {
+        vEditCancel.addEventListener('click', showRead);
+      }
+
+      document.querySelectorAll('[data-item-view]').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+          // 卡片里还嵌着删除表单，点它时别顺手把详情也弹出来
+          if (e.target.closest('form, button, a')) { return; }
+          openViewer(card);
+        });
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {   // 键盘也能开（卡片是 tabindex=0）
+            e.preventDefault();
+            openViewer(card);
+          }
+        });
+      });
+    }
+
+    // Esc 关闭所有打开的弹窗
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') { return; }
+      document.querySelectorAll('.modal.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+    });
+
+    // 分类增删走 fetch：弹窗不关、页面不重载，可以连着加好几个
+    var catModal = document.getElementById('catModal');
+    if (catModal) {
+      var catMsg = document.getElementById('catMsg');
+      var catMsgTimer = null;
+
+      var showCatMsg = function (text, ok) {
+        if (!catMsg || !text) { return; }
+        catMsg.textContent = text;
+        catMsg.className = 'cat-msg' + (ok ? '' : ' err');
+        catMsg.hidden = false;
+        clearTimeout(catMsgTimer);
+        catMsgTimer = setTimeout(function () { catMsg.hidden = true; }, 3500);
+      };
+
+      var csrfValue = function () {
+        var input = catModal.querySelector('input[name="csrf_token"]');
+        return input ? input.value : '';
+      };
+
+      // 新分类要能马上在下拉里选到；删掉的要立刻拿掉
+      var syncSelects = function (kind, action, cat) {
+        document.querySelectorAll('select[data-cat-select="' + kind + '"]')
+          .forEach(function (sel) {
+            var opt = sel.querySelector('option[value="' + cat.id + '"]');
+            if (action === 'add') {
+              if (opt) { return; }
+              opt = document.createElement('option');
+              opt.value = cat.id;
+              opt.textContent = cat.name;
+              sel.appendChild(opt);
+            } else if (opt) {
+              opt.remove();
+            }
+          });
+      };
+
+      var kindBlock = function (kind) {
+        return catModal.querySelector('.cat-block[data-kind="' + kind + '"]');
+      };
+
+      var setCounter = function (kind, count) {
+        var block = kindBlock(kind);
+        var counter = block && block.querySelector('.cat-block-head span');
+        if (counter) { counter.textContent = count + ' 个'; }
+      };
+
+      var setEmptyHint = function (kind) {
+        var block = kindBlock(kind);
+        var chips = block && block.querySelector('.cat-chips');
+        if (!chips) { return; }
+        var hint = chips.querySelector('.cat-empty');
+        if (chips.querySelector('.cat-del') && hint) {
+          hint.remove();
+        } else if (!chips.querySelector('.cat-del') && !hint) {
+          hint = document.createElement('span');
+          hint.className = 'cat-empty';
+          hint.textContent = '还没有，在下面加一个';
+          chips.appendChild(hint);
+        }
+      };
+
+      // 新加的分类也要能删：按服务端返回的地址现场拼一个相同的表单
+      var buildChip = function (cat) {
+        var form = document.createElement('form');
+        form.className = 'cat-del';
+        form.method = 'post';
+        form.action = cat.delete_url;      // 地址来自服务端，前端不拼路由
+        form.dataset.confirm = '删除「' + cat.name + '」？用到它的谷子会变成未分类';
+
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = 'csrf_token';
+        token.value = csrfValue();         // 复用同一个 session 的 token
+
+        var btn = document.createElement('button');
+        btn.type = 'submit';
+        btn.className = 'cat-chip';
+        btn.title = '删除「' + cat.name + '」';
+        btn.textContent = cat.name + ' ';
+        var cross = document.createElement('i');
+        cross.textContent = '×';
+        btn.appendChild(cross);
+
+        form.appendChild(token);
+        form.appendChild(btn);
+        return form;
+      };
+
+      var send = function (form, done) {
+        fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        }).then(function (resp) {
+          return resp.json().then(function (data) {
+            return { status: resp.status, data: data };
+          }, function () { return null; });   // 不是 JSON
+        }).then(function (res) {
+          if (!res || !res.data) { form.submit(); return; }  // 退回普通提交
+          showCatMsg(res.data.message, res.data.ok);
+          if (res.data.ok) { done(res.data); }
+        }).catch(function () { form.submit(); });            // 网络挂了也别卡住
+      };
+
+      catModal.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (e.defaultPrevented) { return; }   // 二次确认里点了取消
+
+        if (form.classList.contains('cat-add')) {
+          e.preventDefault();
+          var kind = form.querySelector('input[name="kind"]').value;
+          var input = form.querySelector('input[name="name"]');
+          send(form, function (data) {
+            syncSelects(data.kind, 'add', data);
+            var block = kindBlock(data.kind);
+            var chips = block && block.querySelector('.cat-chips');
+            if (chips) { chips.appendChild(buildChip(data)); }
+            setEmptyHint(data.kind);
+            setCounter(data.kind, data.count);
+            input.value = '';
+            input.focus();                    // 光标留着，连着加下一个
+          });
+        } else if (form.classList.contains('cat-del')) {
+          e.preventDefault();
+          send(form, function (data) {
+            syncSelects(data.kind, 'delete', data);
+            form.remove();
+            setEmptyHint(data.kind);
+            setCounter(data.kind, data.count);
+          });
+        }
+      });
+    }
+    // 统一的「+」：先选要添加什么，再把对应的表单开起来。
+    // 谷柜 / 在途 / 已出 / 心愿单 用的是同一张谷子表单，区别只是进来时预设的状态。
+    var addModal = document.getElementById('addModal');
+    var addSheet = document.getElementById('addSheet');
+    if (addModal) {
+      var addForm = addModal.querySelector('form');
+      var addTitle = document.getElementById('addFormTitle');
+      var addKinds = {
+        displaying: '添加到谷柜',
+        in_transit: '添加在途的谷子',
+        sold: '添加已出记录',
+        wishlist: '添加心愿单',
+      };
+
+      var openAddForm = function (kind) {
+        var sel = addForm.querySelector('select[name="status"]');
+        if (sel) { sel.value = addKinds[kind] ? kind : 'displaying'; }
+        if (addTitle) { addTitle.textContent = addKinds[kind] || '添加谷子'; }
+        syncStatusFields(addForm, 'status');   // 展开这个状态专属的字段
+        toggleModal('addModal', true);
+      };
+
+      // 选择面板里点一项，和空状态里的「＋ 记一件…」都走这里
+      document.querySelectorAll('[data-add-kind]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          toggleModal('addSheet', false);   // 从面板进来的话先把它收起来，别叠两层
+          openAddForm(btn.dataset.addKind);
+        });
+      });
+    }
+
+    // 面板里的「提醒 / 换谷」各自打开自己的弹窗（data-modal-open 已由上面的通用逻辑
+    // 和下面各自的脚本接管），这里只负责把面板收起来。
+    if (addSheet) {
+      addSheet.querySelectorAll('[data-modal-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          toggleModal('addSheet', false);
+        });
+      });
+    }
+
+    // 再贩提醒：一个弹窗两用（添加 / 编辑），靠 data-* 预填
+    var reminderModal = document.getElementById('reminderModal');
+    if (reminderModal) {
+      var remForm = document.getElementById('reminderForm');
+      var remTitleEl = document.getElementById('reminderFormTitle');
+      var remAddAction = remForm.getAttribute('action');
+      var remEls = {
+        title: document.getElementById('remTitle'),
+        time: document.getElementById('remTime'),
+        priority: document.getElementById('remPriority'),
+        subtitle: document.getElementById('remSubtitle'),
+        link: document.getElementById('remLink'),
+      };
+
+      var openReminder = function (mode, row) {
+        var d = row ? row.dataset : null;
+        remForm.setAttribute('action', mode === 'edit' && d ? d.editUrl : remAddAction);
+        remTitleEl.textContent = (mode === 'edit' ? '编辑提醒' : '添加再贩提醒');
+        remEls.title.value = d ? d.title : '';
+        remEls.time.value = d ? d.time : '';
+        remEls.priority.value = d ? d.priority : 'normal';
+        remEls.subtitle.value = d ? d.subtitle : '';
+        remEls.link.value = d ? d.link : '';
+        toggleModal('reminderModal', true);
+      };
+
+      document.querySelectorAll('[data-modal-open="reminderModal"]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          openReminder(el.dataset.reminderMode || 'add', null);
+        });
+      });
+      document.querySelectorAll('[data-reminder-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var row = btn.closest('[data-reminder-id]');
+          if (row) { openReminder('edit', row); }
+        });
+      });
+    }
+
+    // 换谷信息：一个弹窗两用（发布 / 编辑）
+    var exchangeModal = document.getElementById('exchangeModal');
+    if (exchangeModal) {
+      var exForm = document.getElementById('exchangeForm');
+      var exTitleEl = document.getElementById('exchangeFormTitle');
+      var exAddAction = exForm.getAttribute('action');
+      var exEls = {
+        title: document.getElementById('exTitle'),
+        want: document.getElementById('exWant'),
+        emoji: document.getElementById('exEmoji'),
+        distance: document.getElementById('exDistance'),
+        place: document.getElementById('exPlace'),
+        contact: document.getElementById('exContact'),
+        note: document.getElementById('exNote'),
+      };
+
+      var openExchange = function (mode, row) {
+        var d = row ? row.dataset : null;
+        exForm.setAttribute('action', mode === 'edit' && d ? d.editUrl : exAddAction);
+        exTitleEl.textContent = (mode === 'edit' ? '编辑换谷信息' : '发布换谷信息');
+        exEls.title.value = d ? d.title : '';
+        exEls.want.value = d ? d.want : '';
+        exEls.emoji.value = d ? d.emoji : '';
+        exEls.distance.value = d ? d.distance : '';
+        exEls.place.value = d ? d.place : '';
+        exEls.contact.value = d ? d.contact : '';
+        exEls.note.value = d ? d.note : '';
+        toggleModal('exchangeModal', true);
+      };
+
+      document.querySelectorAll('[data-modal-open="exchangeModal"]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          openExchange(el.dataset.exchangeMode || 'add', null);
+        });
+      });
+      document.querySelectorAll('[data-exchange-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var row = btn.closest('[data-exchange-id]');
+          if (row) { openExchange('edit', row); }
+        });
+      });
+    }
+  </script>
+</body>
+</html>

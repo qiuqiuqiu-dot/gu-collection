@@ -1,0 +1,41 @@
+{# 已出清单（仪表盘板块和 /sold 页共用）
+   需要上下文里的 sold —— 已出且按出手日期排好序。
+   右侧小标签显示盈亏（有入手价才算得出），没有就退而显示成交价。
+   每行可点开详情；「撤回」是普通 POST。 #}
+{% for item in sold %}
+<div class="side-item{% if item.profit_state %} is-{{ item.profit_state }}{% endif %}"
+     data-item-view role="button" tabindex="0"
+     aria-label="查看「{{ item.name }}」详情"
+     {% include "_item_data.html" %}>
+  <div class="s-thumb"
+       style="background:linear-gradient(145deg,{{ item.color_start }},{{ item.color_end }})">
+    {% if item.image %}
+    <img src="{{ url_for('static', filename='uploads/' ~ item.image) }}"
+         alt="{{ item.name }}" loading="lazy">
+    {% else %}
+    <span>{{ item.emoji }}</span>
+    {% endif %}
+  </div>
+
+  <div class="s-body">
+    <p class="s-name">{{ item.name }}</p>
+    {% if item.sold_source_text %}<span class="s-src">{{ item.sold_source_text }}</span>{% endif %}
+    <span class="s-meta">{{ item.sold_meta_text }}</span>
+  </div>
+
+  <div class="s-right">
+    {% if item.profit_text %}
+    <span class="s-pill {{ item.profit_state }}">{{ item.profit_text }}</span>
+    {% elif item.sold_price_text %}
+    <span class="s-pill">{{ item.sold_price_text }}</span>
+    {% else %}
+    <span class="s-pill muted">无记录</span>
+    {% endif %}
+    <form method="post" action="{{ url_for('main.restore_item', item_id=item.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button type="submit" class="s-act">撤回</button>
+    </form>
+  </div>
+</div>
+{% endfor %}

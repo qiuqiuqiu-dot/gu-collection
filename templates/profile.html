@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}个人信息 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone plain">
+  <div class="screen">
+
+    <header class="app-header">
+      <div class="greet">
+        <h1>个人信息</h1>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {# 只读列表：每一项点进去才是编辑页，主页面不放保存按钮 #}
+    <div class="wx-group">
+      <a class="wx-item" href="{{ url_for('main.profile_avatar') }}" id="itemAvatar">
+        <span class="wx-label">头像</span>
+        <span class="wx-value">
+          <span class="wx-thumb">
+            {% if current_user.avatar %}
+            <img src="{{ url_for('static', filename='uploads/' ~ current_user.avatar) }}"
+                 alt="{{ current_user.username }} 的头像">
+            {% else %}
+            <span>{{ (current_user.username or '谷')[0] | upper }}</span>
+            {% endif %}
+          </span>
+        </span>
+        <span class="wx-arrow">›</span>
+      </a>
+
+      <a class="wx-item" href="{{ url_for('main.profile_username') }}" id="itemUsername">
+        <span class="wx-label">名字</span>
+        <span class="wx-value is-set">{{ current_user.username }}</span>
+        <span class="wx-arrow">›</span>
+      </a>
+
+      <a class="wx-item" href="{{ url_for('main.profile_signature') }}" id="itemSignature">
+        <span class="wx-label">签名</span>
+        <span class="wx-value{% if current_user.signature %} is-set{% endif %}"
+              id="signatureValue">{{ current_user.signature or '未填写' }}</span>
+        <span class="wx-arrow">›</span>
+      </a>
+
+      <a class="wx-item" href="{{ url_for('main.profile_region') }}" id="itemRegion">
+        <span class="wx-label">地区</span>
+        <span class="wx-value{% if region_text %} is-set{% endif %}" id="regionValue">
+          {{ region_text or '未填写' }}
+        </span>
+        <span class="wx-arrow">›</span>
+      </a>
+    </div>
+
+    <div class="wx-group">
+      <a class="wx-item" href="{{ url_for('main.account_data_page') }}" id="itemAccountData">
+        <span class="wx-label">账号与数据</span>
+        <span class="wx-value">密码 · 备份</span>
+        <span class="wx-arrow">›</span>
+      </a>
+    </div>
+
+    <p class="wx-note">
+      我的谷仓：{{ item_count }} 件谷子。密码只存了散列值，忘了谁也找不回来
+      （这个程序没有邮箱找回），建议记在密码管理器里。
+    </p>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}谷柜 · 谷仓{% endblock %}
+{% block body %}
+<div class="phone">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+
+  <div class="screen">
+
+    <!-- 顶栏 -->
+    <header class="app-header">
+      <div class="greet">
+        <h1>谷柜</h1>
+        <p>共 {{ total_items }} 件 · 点图片看大图和详情</p>
+      </div>
+      <a class="back-btn" href="{{ url_for('main.index') }}"
+         aria-label="返回首页" title="返回首页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        <span>返回首页</span>
+      </a>
+    </header>
+
+    {% include "_catswitch.html" %}
+
+    <!-- 全部谷子，按选定维度分组 -->
+    {% include "_grid.html" %}
+
+  </div>
+
+  {% include "_add_sheet.html" %}
+  {% include "_viewer.html" %}
+
+</div>
+{% endblock %}

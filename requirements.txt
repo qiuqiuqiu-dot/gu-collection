@@ -1,0 +1,7 @@
+# Web 框架与扩展（Python >= 3.8；推荐 3.11+，本机可用 Python 3.13）
+Flask>=3.0,<4.0
+Flask-SQLAlchemy>=3.1,<4.0
+Flask-Login>=0.6.3,<0.7
+Flask-WTF>=1.2,<2.0
+# 图片上传：校验真实格式 + 压缩尺寸
+Pillow>=10.0
